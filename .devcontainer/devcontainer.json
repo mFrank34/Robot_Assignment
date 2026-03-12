@@ -1,0 +1,28 @@
+{
+  "name": "ROS2 Humble Desktop Full",
+  "image": "osrf/ros:humble-desktop-full",
+  "remoteUser": "root",
+  "containerUser": "root",
+  "runArgs": [
+    "--network=host",
+    "-e",
+    "DISPLAY=:0",
+    "-v",
+    "/tmp/.X11-unix:/tmp/.X11-unix",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt=seccomp=unconfined",
+    "--userns=keep-id"
+  ],
+  "workspaceMount": "source=/home/frank/Projects/Robot_Assignment,target=/Workspace,type=bind",
+  "workspaceFolder": "/Workspace",
+  "customizations": {
+    "jetbrains": {
+      "backend": "PyCharm"
+    }
+  },
+  "remoteEnv": {
+    "PYTHONPATH": "/opt/ros/humble/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages",
+    "ROS_DISTRO": "humble"
+  },
+  "postCreateCommand": "git config --global --add safe.directory /workspace && echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc"
+}
