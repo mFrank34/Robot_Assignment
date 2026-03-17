@@ -1,28 +1,28 @@
 {
-  "name": "ROS2 Humble Desktop Full",
-  "image": "osrf/ros:humble-desktop-full",
-  "remoteUser": "root",
-  "containerUser": "root",
+  "name": "ROS2 Humble Dev",
+  "build": {
+    "dockerfile": "Container"
+  },
+  "workspaceMount": "source=/home/frank/Projects/Robotics,target=/workspace,type=bind,Z",
+  "workspaceFolder": "/workspace",
   "runArgs": [
-    "--network=host",
-    "-e",
-    "DISPLAY=:0",
-    "-v",
-    "/tmp/.X11-unix:/tmp/.X11-unix",
     "--cap-add=SYS_PTRACE",
     "--security-opt=seccomp=unconfined",
-    "--userns=keep-id"
+    "--security-opt=label=disable",
+    "--userns=keep-id",
+    "-e",
+    "DISPLAY=${env:DISPLAY}",
+    "-e",
+    "XAUTHORITY=/tmp/.Xauthority",
+    "-v",
+    "/tmp/.X11-unix:/tmp/.X11-unix",
+    "-v",
+    "/home/frank/.Xauthority:/tmp/.Xauthority:ro"
   ],
-  "workspaceMount": "source=/home/frank/Projects/Robot_Assignment,target=/Workspace,type=bind",
-  "workspaceFolder": "/Workspace",
-  "customizations": {
-    "jetbrains": {
-      "backend": "PyCharm"
-    }
-  },
+  "remoteUser": "root",
+  "containerUser": "root",
   "remoteEnv": {
-    "PYTHONPATH": "/opt/ros/humble/local/lib/python3.10/dist-packages:/opt/ros/humble/lib/python3.10/site-packages",
-    "ROS_DISTRO": "humble"
-  },
-  "postCreateCommand": "git config --global --add safe.directory /workspace && echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc"
+    "HOME": "/workspace",
+    "GIT_CONFIG_GLOBAL": "/workspace/.gitconfig"
+  }
 }
