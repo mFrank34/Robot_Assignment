@@ -9,6 +9,7 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String, Float64
+from robot.modules.state import state
 
 
 class RobotServer(Node):
@@ -75,7 +76,17 @@ class RobotServer(Node):
             self.get_logger().info('Autonomous mode stopped')
 
     def update(self):
-        pass
+        state = self.reactive.update(min_front, min_back)
+
+        if state == State.CLEAR:
+            pass
+        elif state == State.REVERSING:
+            pass
+        elif state == State.OBSTACLE:
+            pass
+        elif state == State.TOO_CLOSE:
+            pass
+
 
     def stop_robot(self):
         msg = Twist()
