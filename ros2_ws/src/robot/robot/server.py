@@ -56,15 +56,6 @@ class RobotServer(Node):
 
         self.get_logger().info('Robot server started')
 
-    def command_callback(self, msg):
-        if msg.data == 'start':
-            self.running = True
-            self.get_logger().info('Autonomous mode started')
-        elif msg.data == 'stop':
-            self.running = False
-            self.stop_robot()
-            self.get_logger().info('Autonomous mode stopped')
-
     def odom_callback(self, msg):
         self.current_odom = msg
 
@@ -74,21 +65,17 @@ class RobotServer(Node):
     def back_lidar_callback(self, msg):
         self.back_scan = msg
 
+    def command_callback(self, msg):
+        if msg.data == 'start':
+            self.running = True
+            self.get_logger().info('Autonomous mode started')
+        elif msg.data == 'stop':
+            self.running = False
+            self.stop_robot()
+            self.get_logger().info('Autonomous mode stopped')
+
     def update(self):
-        if not self.running or self.front_scan is None:
-            return
-
-        min_distance = min(self.front_scan.ranges)
-
-        if min_distance > 2.0:
-            # clear — speed up
-            pass
-        elif min_distance < 0.5:
-            # too close — stop and rotate
-            pass
-        else:
-            # obstacle nearby — slow and turn
-            pass
+        pass
 
     def stop_robot(self):
         msg = Twist()
