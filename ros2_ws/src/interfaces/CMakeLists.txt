@@ -12,7 +12,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-    "srv/data_stream.srv"
+    "srv/DataStream.srv"
 )
 
 if(BUILD_TESTING)

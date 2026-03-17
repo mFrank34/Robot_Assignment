@@ -6,7 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/ros2_ws/install" />
       <excludeFolder url="file://$MODULE_DIR$/ros2_ws/log" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.10 (Workspace)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.10 (workspace)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
