@@ -1,3 +1,8 @@
+"""
+File: launch.py
+About: file for launching the bridge connection to gazebo
+"""
+
 from launch import LaunchDescription
 from launch_ros.actions import Node
 
