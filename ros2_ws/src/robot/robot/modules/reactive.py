@@ -4,23 +4,49 @@ About: obstacle avoidance
 Author: Michael Franks
 """
 
-from robot.modules import State
+from robot.modules.state import State
+
+from robot.modules.state import State
+
 
 class Reactive:
     def __init__(self):
         self.state = State.CLEAR
+        self.last_state = State.CLEAR
+        self.distance = 0.4
+        self.turning = False
+        self.turn_count = 0
 
     def update(self, forward_distance, backward_distance):
-        if forward_distance > 2.0 > backward_distance > 2.0:
-            # both clear — move forward freely
-            self.state = State.CLEAR
-        elif forward_distance < 2.0 < backward_distance:
-            # blocked in front, clear behind — reverse
-            self.state = State.REVERSING
-        elif forward_distance > 2.0 > backward_distance:
-            # clear in front, blocked behind — move forward
-            self.state = State.OBSTACLE
-        else:
-            # blocked both sides — spin to find clear direction
+        self.last_state = self.state
+
+        # --- TURNING MODE (commit properly) ---
+        if self.turning:
+            self.turn_count += 1
+
+            # MUST turn for a minimum time
+            if self.turn_count < 15:
+                self.state = State.TOO_CLOSE
+                return self.state, self.last_state
+
+            # after that, only stop if actually clear
+            if forward_distance > self.distance:
+                self.turning = False
+                self.turn_count = 0
+                self.state = State.CLEAR
+            else:
+                self.state = State.TOO_CLOSE
+
+            return self.state, self.last_state
+
+        # --- NORMAL MODE ---
+        # obstacle in front start turning
+        if forward_distance < self.distance:
+            self.turning = True
+            self.turn_count = 0
             self.state = State.TOO_CLOSE
-        return self.state
+
+        else:
+            self.state = State.CLEAR
+
+        return self.state, self.last_state

@@ -9,13 +9,19 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String, Float64
-from robot.modules.state import state
+
+""" Personal Class and Enums """
+from robot.modules.state import State
+from robot.modules.reactive import Reactive
+from robot.modules.commander import Commander
 
 
 class RobotServer(Node):
     def __init__(self):
         super().__init__('robot_node')
         self.running = False
+        self.controller = Commander(self)
+        self.reactive = Reactive()
 
         # Store latest data
         self.current_odom = None
@@ -48,10 +54,6 @@ class RobotServer(Node):
             10
         )
 
-        # Publishers
-        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.pan_pub = self.create_publisher(Float64, '/camera_pan', 10)
-
         # Timer — runs update every 100ms
         self.timer = self.create_timer(0.1, self.update)
 
@@ -76,23 +78,39 @@ class RobotServer(Node):
             self.get_logger().info('Autonomous mode stopped')
 
     def update(self):
-        state = self.reactive.update(min_front, min_back)
+        if not self.running or self.front_scan is None or self.back_scan is None:
+            return
 
-        if state == State.CLEAR:
-            pass
-        elif state == State.REVERSING:
-            pass
-        elif state == State.OBSTACLE:
-            pass
-        elif state == State.TOO_CLOSE:
-            pass
+        # Filter out invalid 0.0 and inf readings
+        front_ranges = [r for r in self.front_scan.ranges if r > 0.0 and r != float('inf')]
+        back_ranges = [r for r in self.back_scan.ranges if r > 0.0 and r != float('inf')]
 
+        # Check we still have valid readings after filtering
+        if not front_ranges or not back_ranges:
+            return
+
+        min_front = min(front_ranges)
+        min_back = min(back_ranges)
+
+        state, last_state = self.reactive.update(min_front, min_back)
+        self.get_logger().info(f'State: {state}, Front: {min_front:.2f}, Back: {min_back:.2f}')
+
+        match state:
+            case State.CLEAR:
+                self.controller.send_velocity(0.5, 0.0)
+
+            case State.OBSTACLE:
+                self.controller.send_velocity(0.3, 0.0)
+
+            case State.TOO_CLOSE:
+                # ALWAYS turn when too close
+                self.controller.send_velocity(0.0, 0.5)
+
+            case State.REVERSING:
+                self.controller.send_velocity(-0.3, 0.0)
 
     def stop_robot(self):
-        msg = Twist()
-        msg.linear.x = 0.0
-        msg.angular.z = 0.0
-        self.cmd_vel_pub.publish(msg)
+        self.controller.send_velocity(0.0, 0.0)
 
 
 def main(args=None):
