@@ -3,7 +3,7 @@
   "build": {
     "dockerfile": "Container"
   },
-  "workspaceMount": "source=/home/frank/Projects/Robotics,target=/workspace,type=bind,Z",
+  "workspaceMount": "source=/home/frank/Projects/Robot_Assignment,target=/workspace,type=bind,Z",
   "workspaceFolder": "/workspace",
   "runArgs": [
     "--cap-add=SYS_PTRACE",
