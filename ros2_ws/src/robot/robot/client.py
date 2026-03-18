@@ -6,7 +6,7 @@ About: Client controlling the robot system for now
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from robot.modules.commander import Commander
+from robot.modules.controller import Controller
 
 
 class ClientNode(Node):
@@ -14,7 +14,7 @@ class ClientNode(Node):
         super().__init__('client_node')
 
         # Use shared commander for movement
-        self.controller = Commander(self)
+        self.controller = Controller(self)
 
         # Command publisher for server
         self.command_pub = self.create_publisher(String, '/robot/command', 10)

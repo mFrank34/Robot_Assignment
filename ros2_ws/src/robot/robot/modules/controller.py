@@ -1,5 +1,5 @@
 """
-File: commander.py
+File: controller.py
 About: system for sending commands to robot for client and server.
 """
 
@@ -7,7 +7,7 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Float64
 
 
-class Commander:
+class Controller:
     def __init__(self, node):
         self.cmd_vel_pub = node.create_publisher(Twist, '/cmd_vel', 10)
         self.pan_pub = node.create_publisher(Float64, '/camera_pan', 10)
