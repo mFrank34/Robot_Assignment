@@ -23,6 +23,9 @@
   "containerUser": "root",
   "remoteEnv": {
     "HOME": "/workspace",
-    "GIT_CONFIG_GLOBAL": "/workspace/.gitconfig"
-  }
+    "GIT_CONFIG_GLOBAL": "/workspace/.gitconfig",
+    "ROS_DISTRO": "humble",
+    "PYTHONPATH": "/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages"
+  },
+  "postCreateCommand": "bash -c 'echo \"source /opt/ros/humble/setup.bash\" >> ~/.bashrc'"
 }

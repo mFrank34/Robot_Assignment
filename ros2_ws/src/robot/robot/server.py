@@ -7,7 +7,6 @@ import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Twist
 from std_msgs.msg import String, Float64
 
 """ Personal Class and Enums """

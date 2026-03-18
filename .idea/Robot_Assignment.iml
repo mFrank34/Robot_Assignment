@@ -4,6 +4,8 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/gazebo_projects" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ros2_ws/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ros2_ws/src/interfaces" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ros2_ws/src/robot" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/ros2_ws/build" />
       <excludeFolder url="file://$MODULE_DIR$/ros2_ws/install" />
       <excludeFolder url="file://$MODULE_DIR$/ros2_ws/log" />
