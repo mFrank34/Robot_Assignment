@@ -11,11 +11,16 @@ from robot.modules.state import State
 
 class Reactive:
     def __init__(self):
+        # state of robot
         self.state = State.CLEAR
         self.last_state = State.CLEAR
+
+        # range of stopping
         self.distance = 0.4
-        self.turning = False
+
+        # turing information
         self.turn_count = 0
+        self.turning = False
 
     def update(self, forward_distance, backward_distance):
         self.last_state = self.state

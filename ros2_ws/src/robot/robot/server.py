@@ -67,6 +67,46 @@ class RobotServer(Node):
     def back_lidar_callback(self, msg):
         self.back_scan = msg
 
+    def action(self, state, turn_direction=0.5):
+        match state:
+            case State.CLEAR:
+                self.controller.send_velocity(0.5, 0.0)
+            case State.OBSTACLE:
+                self.controller.send_velocity(0.3, 0.0)
+            case State.TOO_CLOSE:
+                # use turn_direction to go left or right
+                self.controller.send_velocity(0.0, turn_direction)
+            case State.REVERSING:
+                self.controller.send_velocity(-0.3, 0.0)
+
+    def update(self):
+        if not self.running or self.front_scan is None or self.back_scan is None:
+            return
+
+        front_ranges = [r for r in self.front_scan.ranges if r > 0.0 and r != float('inf')]
+        back_ranges = [r for r in self.back_scan.ranges if r > 0.0 and r != float('inf')]
+
+        if not front_ranges or not back_ranges:
+            return
+
+        # split front scan into three sections
+        total = len(front_ranges)
+        third = total // 3
+        min_left = min(front_ranges[:third])
+        min_centre = min(front_ranges[third:third * 2])
+        min_right = min(front_ranges[third * 2:])
+        min_back = min(back_ranges)
+
+        # decide turn direction based on which side has more space
+        turn_direction = 0.5 if min_left > min_right else -0.5
+
+        state, last_state = self.reactive.update(min_centre, min_back)
+        self.get_logger().info(
+            f'State: {state}, Left: {min_left:.2f}, Centre: {min_centre:.2f}, Right: {min_right:.2f}, Back: {min_back:.2f}'
+        )
+
+        self.action(state, turn_direction)
+
     def command_callback(self, msg):
         if msg.data == 'start':
             self.running = True
@@ -75,38 +115,6 @@ class RobotServer(Node):
             self.running = False
             self.stop_robot()
             self.get_logger().info('Autonomous mode stopped')
-
-    def update(self):
-        if not self.running or self.front_scan is None or self.back_scan is None:
-            return
-
-        # Filter out invalid 0.0 and inf readings
-        front_ranges = [r for r in self.front_scan.ranges if r > 0.0 and r != float('inf')]
-        back_ranges = [r for r in self.back_scan.ranges if r > 0.0 and r != float('inf')]
-
-        # Check we still have valid readings after filtering
-        if not front_ranges or not back_ranges:
-            return
-
-        min_front = min(front_ranges)
-        min_back = min(back_ranges)
-
-        state, last_state = self.reactive.update(min_front, min_back)
-        self.get_logger().info(f'State: {state}, Front: {min_front:.2f}, Back: {min_back:.2f}')
-
-        match state:
-            case State.CLEAR:
-                self.controller.send_velocity(0.5, 0.0)
-
-            case State.OBSTACLE:
-                self.controller.send_velocity(0.3, 0.0)
-
-            case State.TOO_CLOSE:
-                # ALWAYS turn when too close
-                self.controller.send_velocity(0.0, 0.5)
-
-            case State.REVERSING:
-                self.controller.send_velocity(-0.3, 0.0)
 
     def stop_robot(self):
         self.controller.send_velocity(0.0, 0.0)
