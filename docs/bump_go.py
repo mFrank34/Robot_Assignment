@@ -110,8 +110,7 @@ class BumpGoNode(Node):
         return elapsed > Duration(seconds=self.REVERSING_TIME)
 
     def check_turn_2_forward(self):
-        elapsed = self.get_clock().now() - self.state_ts
-        return elapsed > Duration(seconds=self.TURNING_TIME)
+        ation(seconds=self.TURNING_TIME)
 
 
 def main(args=None):

@@ -7,7 +7,7 @@ from enum import Enum
 
 
 class State(Enum):
-    CLEAR = 'clear'
-    OBSTACLE = 'obstacle'
-    TOO_CLOSE = 'too_close'
-    REVERSING = 'reversing'
+    FORWARD = 0
+    REVERSE = 1
+    TURN = 2
+    STOP = 3

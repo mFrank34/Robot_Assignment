@@ -5,123 +5,110 @@ Author: Michael Franks
 """
 
 from rclpy.duration import Duration
+from rclpy.time import Time
+from geometry_msgs.msg import Twist
 from robot.modules.state import State
 
 
 class Reactive:
-    def __init__(self, clock):
+    def __init__(self, clock, logger=None):
         self.clock = clock
+        self.logger = logger
         self.state_ts = self.clock.now()
 
         # robot state
-        self.state = State.CLEAR
-        self.last_state = State.CLEAR
+        self.state = State.FORWARD
+        self.last_ts = self.clock.now()
 
-        # stopping distance
-        self.distance = 0.5
+        # timing system
+        self.TURNING_TIME = 2.0
+        self.REVERSING_TIME = 2.0
+        self.SCAN_TIMEOUT = 1.0
 
-        # hysteresis — require more clearance to exit manoeuvre than to enter
-        self.clear_margin = 1.2
+        # speeds
+        self.SPEED_LINEAR = 0.3
+        self.SPEED_ANGULAR = 0.3
 
-        # turning info
-        self.turning = False
-        self.turn_direction = 1.0  # positive = left, negative = right
-        self.min_turn_time = Duration(seconds=1.5)
-        self.max_turn_time = Duration(seconds=3.0)
-        self.turn_attempts = 0
-        self.max_turn_attempts = 2
+        # obstacle threshold
+        self.OBSTACLE_DISTANCE = 1.0
 
-        # reversing info
-        self.reversing = False
-        self.max_reverse_time = Duration(seconds=3.0)
+        self.last_scan = None
+        self.controller = None
 
-    def go_state(self, turning=False, reversing=False):
-        self.turning = turning
-        self.reversing = reversing
+    def log(self, msg):
+        if self.logger:
+            self.logger.info(msg)
+
+    def go_state(self, new_state):
+        self.state = new_state
         self.state_ts = self.clock.now()
 
-    def update(self, front_left, front_centre, front_right, min_front,
-               back_left, back_centre, back_right, min_back):
-        self.last_state = self.state
+    def check_forward_2_reverse(self):
+        pos = round(len(self.last_scan.ranges) / 2)
+        return self.last_scan.ranges[pos] < self.OBSTACLE_DISTANCE
 
-        clear_threshold = self.distance * self.clear_margin
+    def check_forward_2_stop(self):
+        elapsed = self.clock.now() - Time.from_msg(self.last_scan.header.stamp)
+        return elapsed > Duration(seconds=self.SCAN_TIMEOUT)
+
+    def check_stop_2_forward(self):
+        elapsed = self.clock.now() - Time.from_msg(self.last_scan.header.stamp)
+        return elapsed < Duration(seconds=self.SCAN_TIMEOUT)
+
+    def check_reverse_2_turn(self):
         elapsed = self.clock.now() - self.state_ts
+        return elapsed > Duration(seconds=self.REVERSING_TIME)
 
-        # only update turn direction when not already manoeuvring
-        if not self.turning and not self.reversing:
-            diff = abs(front_left - front_right)
-            if diff > 0.2:
-                self.turn_direction = 1.0 if front_left > front_right else -1.0
+    def check_turn_2_forward(self):
+        elapsed = self.clock.now() - self.state_ts
+        return elapsed > Duration(seconds=self.TURNING_TIME)
 
-        # --- TURNING MODE ---
-        if self.turning:
+    def forward(self, out_vel):
+        out_vel.linear.x = self.SPEED_LINEAR
+        self.log('Moving forward ...')
+        if self.check_forward_2_stop():
+            self.go_state(State.STOP)
+        elif self.check_forward_2_reverse():
+            self.go_state(State.REVERSE)
 
-            # don't check exit until we've turned enough to actually reorient
-            if elapsed > self.min_turn_time:
-                if self.turn_direction > 0:
-                    side_clear = front_left > clear_threshold
-                else:
-                    side_clear = front_right > clear_threshold
+    def reverse(self, out_vel):
+        out_vel.linear.x = -self.SPEED_LINEAR
+        self.log('Reversing ...')
+        if self.check_reverse_2_turn():
+            self.go_state(State.TURN)
 
-                if side_clear and min_front > clear_threshold:
-                    self.turn_attempts = 0
-                    self.state = State.CLEAR
-                    self.go_state()
-                    return self.state, self.last_state, self.turn_direction, back_centre
+    def turn(self, out_vel):
+        out_vel.angular.z = self.SPEED_ANGULAR
+        self.log('Turning ...')
+        if self.check_turn_2_forward():
+            self.go_state(State.FORWARD)
 
-            # been turning too long
-            if elapsed > self.max_turn_time:
-                self.turn_attempts += 1
+    def stop(self, out_vel):
+        out_vel.linear.x = 0.0
+        out_vel.angular.z = 0.0
+        self.log('Stopped, waiting for sensor data ...')
+        if self.check_stop_2_forward():
+            self.go_state(State.FORWARD)
 
-                if self.turn_attempts < self.max_turn_attempts:
-                    # flip direction and try again
-                    self.turn_direction *= -1
-                    self.go_state(turning=True)
-                    self.state = State.TOO_CLOSE
-                elif min_back > self.distance:
-                    # try reversing
-                    self.turn_attempts = 0
-                    self.state = State.REVERSING
-                    self.go_state(reversing=True)
-                else:
-                    # back blocked too, keep turning
-                    self.turn_attempts = 0
-                    self.go_state(turning=True)
-                    self.state = State.TOO_CLOSE
-            else:
-                self.state = State.TOO_CLOSE
+    def control_cycle(self):
+        out_vel = Twist()
 
-            return self.state, self.last_state, self.turn_direction, back_centre
+        if self.last_scan is None:
+            return out_vel
 
-        # --- REVERSING MODE ---
-        if self.reversing:
+        match self.state:
+            case State.FORWARD:
+                self.forward(out_vel)
+            case State.REVERSE:
+                self.reverse(out_vel)
+            case State.TURN:
+                self.turn(out_vel)
+            case State.STOP:
+                self.stop(out_vel)
 
-            # front is clear — pick best direction and turn to reorient
-            if min_front > clear_threshold and front_left > clear_threshold and front_right > clear_threshold:
-                if abs(front_left - front_right) > 0.2:
-                    self.turn_direction = 1.0 if front_left > front_right else -1.0
-                self.state = State.TOO_CLOSE
-                self.go_state(turning=True)
-                return self.state, self.last_state, self.turn_direction, back_centre
+        return out_vel
 
-            # been reversing too long — pick best direction and turn
-            if elapsed > self.max_reverse_time:
-                if abs(front_left - front_right) > 0.2:
-                    self.turn_direction = 1.0 if front_left > front_right else -1.0
-                self.state = State.TOO_CLOSE
-                self.go_state(turning=True)
-            else:
-                self.state = State.REVERSING
-
-            return self.state, self.last_state, self.turn_direction, back_centre
-
-        # --- NORMAL MODE ---
-        if min_front < self.distance or front_left < self.distance or front_right < self.distance:
-            self.go_state(turning=True)
-            self.state = State.TOO_CLOSE
-        elif min_back < self.distance:
-            self.state = State.OBSTACLE
-        else:
-            self.state = State.CLEAR
-
-        return self.state, self.last_state, self.turn_direction, back_centre
+    def update(self, front_scan, controller):
+        self.last_scan = front_scan
+        self.controller = controller
+        return self.control_cycle()
