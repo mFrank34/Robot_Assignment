@@ -8,50 +8,38 @@ from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String
+import math
 
 from robot.modules.state import State
 from robot.modules.reactive import Reactive
 from robot.modules.controller import Controller
+from robot.data.dimensions import RobotDimensions
 
 
 class RobotServer(Node):
     def __init__(self):
         super().__init__('robot_node')
-        self.last_turn_direction = 0.5
+
         self.running = False
         self.controller = Controller(self)
-        self.reactive = Reactive(self.get_clock(), self.get_logger())
+
+        dims = RobotDimensions()
+        self.reactive = Reactive(self.get_clock(), self.get_logger(), dims)
 
         self.current_odom = None
         self.front_scan = None
         self.back_scan = None
 
-        self.odom_sub = self.create_subscription(
-            Odometry,
-            '/model/square_bot/odometry',
-            self.odom_callback,
-            10
-        )
-        self.front_lidar_sub = self.create_subscription(
-            LaserScan,
-            '/front_lidar/scan',
-            self.front_lidar_callback,
-            10
-        )
-        self.back_lidar_sub = self.create_subscription(
-            LaserScan,
-            '/back_lidar/scan',
-            self.back_lidar_callback,
-            10
-        )
-        self.command_sub = self.create_subscription(
-            String,
-            '/robot/command',
-            self.command_callback,
-            10
-        )
+        self.last_turn_direction = 0.5
+
+        # subscriptions
+        self.create_subscription(Odometry, '/model/square_bot/odometry', self.odom_callback, 10)
+        self.create_subscription(LaserScan, '/front_lidar/scan', self.front_lidar_callback, 10)
+        self.create_subscription(LaserScan, '/back_lidar/scan', self.back_lidar_callback, 10)
+        self.create_subscription(String, '/robot/command', self.command_callback, 10)
 
         self.timer = self.create_timer(0.1, self.update)
+
         self.get_logger().info('Robot server started')
 
     def odom_callback(self, msg):
@@ -63,75 +51,87 @@ class RobotServer(Node):
     def back_lidar_callback(self, msg):
         self.back_scan = msg
 
-    def front_range(self):
-        """Return min left, centre, right, and overall front distance"""
-        front_ranges = [r for r in self.front_scan.ranges if r > 0.0 and r != float('inf')]
+    # -------------------------
+    # SAFE RANGE PROCESSING
+    # -------------------------
+    def split_scan(self, scan):
+        ranges = [r for r in scan.ranges if r > 0.0 and not math.isnan(r)]
+        if not ranges:
+            ranges = [float('inf')]
 
-        if not front_ranges:
-            return None, None, None, None
+        third = len(ranges) // 3
+        left = ranges[:third]
+        centre = ranges[third:third * 2]
+        right = ranges[third * 2:]
 
-        total = len(front_ranges)
-        third = total // 3
+        # safer: use median
+        def safe_median(section):
+            sorted_vals = sorted(section)
+            mid = len(sorted_vals) // 2
+            return sorted_vals[mid] if sorted_vals else float('inf')
 
-        min_left = min(front_ranges[:third])
-        min_centre = min(front_ranges[third:third * 2])
-        min_right = min(front_ranges[third * 2:])
-        min_front = min(front_ranges)
+        left_med = safe_median(left)
+        centre_med = safe_median(centre)
+        right_med = safe_median(right)
 
-        return min_left, min_centre, min_right, min_front
+        all_vals = left + centre + right
+        all_med = safe_median(all_vals)
 
-    def back_range(self):
-        """Return min left, centre, right, and overall back distance"""
-        back_ranges = [r for r in self.back_scan.ranges if r > 0.0 and r != float('inf')]
+        return left_med, centre_med, right_med, all_med
 
-        if not back_ranges:
-            return None, None, None, None
-
-        total = len(back_ranges)
-        third = total // 3
-
-        min_left = min(back_ranges[:third])
-        min_centre = min(back_ranges[third:third * 2])
-        min_right = min(back_ranges[third * 2:])
-        min_back = min(back_ranges)
-
-        return min_left, min_centre, min_right, min_back
-
-    def action(self, state, turn_direction=0.5, front_centre=1.0, back_centre=1.0):
+    # -------------------------
+    # ACTION (execution only)
+    # -------------------------
+    def action(self, state, front_centre, back_centre):
         match state:
             case State.FORWARD:
                 speed = max(0.2, min(1.0, front_centre * 0.5))
                 self.controller.send_velocity(speed, 0.0)
+
             case State.REVERSE:
                 speed = max(0.1, min(0.3, back_centre * 0.3))
                 self.controller.send_velocity(-speed, 0.0)
+
             case State.TURN:
-                self.controller.send_velocity(0.0, turn_direction)
+                self.controller.send_velocity(0.0, self.last_turn_direction)
+
             case State.STOP:
                 self.controller.send_velocity(0.0, 0.0)
 
+    # -------------------------
+    # MAIN LOOP
+    # -------------------------
     def update(self):
         if not self.running or self.front_scan is None or self.back_scan is None:
             return
 
-        front_left, front_centre, front_right, min_front = self.front_range()
-        back_left, back_centre, back_right, min_back = self.back_range()
+        front = self.split_scan(self.front_scan)
+        back = self.split_scan(self.back_scan)
 
-        if None in (front_left, front_centre, front_right, min_front,
-                    back_left, back_centre, back_right, min_back):
+        if front is None or back is None:
+            self.get_logger().warn("Invalid scan data")
             return
 
-        if self.reactive.state == State.TURN:
-            self.last_turn_direction = 0.5 if front_right > front_left else -0.5
+        _, front_centre, _, _ = front
+        _, back_centre, _, _ = back
 
-        self.reactive.update(self.front_scan, self.controller)
+        # update decision system
+        self.reactive.update(self.front_scan, self.controller, self.current_odom)
 
-        self.action(self.reactive.state, self.last_turn_direction, front_centre, back_centre)
+        # sync direction from reactive (single source of truth)
+        self.last_turn_direction = self.reactive.turn_direction
 
+        # execute movement
+        self.action(self.reactive.state, front_centre, back_centre)
+
+    # -------------------------
+    # COMMANDS
+    # -------------------------
     def command_callback(self, msg):
         if msg.data == 'start':
             self.running = True
             self.get_logger().info('Autonomous mode started')
+
         elif msg.data == 'stop':
             self.running = False
             self.stop_robot()
