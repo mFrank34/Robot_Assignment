@@ -15,7 +15,6 @@ def generate_launch_description():
             arguments=[
                 '/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist',
                 '/front_lidar/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
-                '/back_lidar/scan@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',
                 '/camera/image@sensor_msgs/msg/Image[ignition.msgs.Image',
                 '/camera_pan@std_msgs/msg/Float64]ignition.msgs.Double',
                 '/camera_tilt@std_msgs/msg/Float64]ignition.msgs.Double',

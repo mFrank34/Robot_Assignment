@@ -93,65 +93,6 @@
             </sensor>
         </link>
 
-        <!--  BACK LIDAR  -->
-        <link name="back_lidar_link">
-            <pose relative_to="chassis">-0.3 0 0.08 0 0 3.1415927</pose>
-            <inertial>
-                <mass>0.1</mass>
-                <inertia>
-                    <ixx>0.001</ixx>
-                    <iyy>0.001</iyy>
-                    <izz>0.001</izz>
-                </inertia>
-            </inertial>
-            <visual name="visual">
-                <geometry>
-                    <cylinder>
-                        <radius>0.04</radius>
-                        <length>0.06</length>
-                    </cylinder>
-                </geometry>
-                <material>
-                    <ambient>0.2 0.2 0.2 1</ambient>
-                    <diffuse>0.2 0.2 0.2 1</diffuse>
-                </material>
-            </visual>
-            <collision name="collision">
-                <geometry>
-                    <cylinder>
-                        <radius>0.04</radius>
-                        <length>0.06</length>
-                    </cylinder>
-                </geometry>
-            </collision>
-            <sensor name="back_lidar" type="gpu_lidar">
-                <pose>0 0 0 0 0 0</pose>
-                <topic>back_lidar/scan</topic>
-                <update_rate>10</update_rate>
-                <lidar>
-                    <scan>
-                        <horizontal>
-                            <samples>360</samples>
-                            <resolution>1</resolution>
-                            <min_angle>-1.5707963</min_angle>
-                            <max_angle>1.5707963</max_angle>
-                        </horizontal>
-                    </scan>
-                    <range>
-                        <min>0.1</min>
-                        <max>10.0</max>
-                        <resolution>0.01</resolution>
-                    </range>
-                    <noise>
-                        <type>gaussian</type>
-                        <mean>0.0</mean>
-                        <stddev>0.01</stddev>
-                    </noise>
-                </lidar>
-                <visualize>true</visualize>
-            </sensor>
-        </link>
-
         <!-- MOTORISED CAMERA -->
         <!-- Pan base: rotates left/right around Z axis -->
         <link name="camera_pan_link">
@@ -241,11 +182,6 @@
             <child>front_lidar_link</child>
         </joint>
 
-        <joint name="back_lidar_joint" type="fixed">
-            <parent>chassis</parent>
-            <child>back_lidar_link</child>
-        </joint>
-
         <!-- Pan joint: left/right +-90 degrees, independent of wheels -->
         <joint name="camera_pan_joint" type="revolute">
             <parent>chassis</parent>
@@ -272,7 +208,7 @@
             </axis>
         </joint>
 
-        <!--  DRIVE WHEELS -->
+        <!--  DRIVE WHEELS (FRONT) -->
         <link name="front_left_wheel">
             <pose relative_to="chassis">0.25 0.3 -0.05 0 0 0</pose>
             <inertial>
@@ -357,22 +293,24 @@
             </collision>
         </link>
 
-        <!-- REAR CASTER  -->
-        <link name="rear_caster">
-            <pose relative_to="chassis">-0.25 0 -0.05 0 0 0</pose>
+        <!--  REAR WHEELS (replacing single caster) -->
+        <link name="rear_left_wheel">
+            <pose relative_to="chassis">-0.25 0.3 -0.05 0 0 0</pose>
             <inertial>
-                <mass>0.1</mass>
+                <mass>0.3</mass>
                 <inertia>
-                    <ixx>0.001</ixx>
-                    <iyy>0.001</iyy>
-                    <izz>0.001</izz>
+                    <ixx>0.01</ixx>
+                    <iyy>0.01</iyy>
+                    <izz>0.02</izz>
                 </inertia>
             </inertial>
             <visual name="visual">
+                <pose>0 0 0 1.5707963 0 0</pose>
                 <geometry>
-                    <sphere>
+                    <cylinder>
                         <radius>0.1</radius>
-                    </sphere>
+                        <length>0.05</length>
+                    </cylinder>
                 </geometry>
                 <material>
                     <ambient>0.1 0.1 0.1 1</ambient>
@@ -380,10 +318,54 @@
                 </material>
             </visual>
             <collision name="collision">
+                <pose>0 0 0 1.5707963 0 0</pose>
                 <geometry>
-                    <sphere>
+                    <cylinder>
                         <radius>0.1</radius>
-                    </sphere>
+                        <length>0.05</length>
+                    </cylinder>
+                </geometry>
+                <surface>
+                    <friction>
+                        <ode>
+                            <mu>0.0</mu>
+                            <mu2>0.0</mu2>
+                        </ode>
+                    </friction>
+                </surface>
+            </collision>
+        </link>
+
+        <link name="rear_right_wheel">
+            <pose relative_to="chassis">-0.25 -0.3 -0.05 0 0 0</pose>
+            <inertial>
+                <mass>0.3</mass>
+                <inertia>
+                    <ixx>0.01</ixx>
+                    <iyy>0.01</iyy>
+                    <izz>0.02</izz>
+                </inertia>
+            </inertial>
+            <visual name="visual">
+                <pose>0 0 0 1.5707963 0 0</pose>
+                <geometry>
+                    <cylinder>
+                        <radius>0.1</radius>
+                        <length>0.05</length>
+                    </cylinder>
+                </geometry>
+                <material>
+                    <ambient>0.1 0.1 0.1 1</ambient>
+                    <diffuse>0.1 0.1 0.1 1</diffuse>
+                </material>
+            </visual>
+            <collision name="collision">
+                <pose>0 0 0 1.5707963 0 0</pose>
+                <geometry>
+                    <cylinder>
+                        <radius>0.1</radius>
+                        <length>0.05</length>
+                    </cylinder>
                 </geometry>
                 <surface>
                     <friction>
@@ -412,9 +394,21 @@
             </axis>
         </joint>
 
-        <joint name="rear_caster_joint" type="fixed">
+        <!-- Rear wheels: passive revolute joints (free to roll, not driven) -->
+        <joint name="rear_left_joint" type="revolute">
             <parent>chassis</parent>
-            <child>rear_caster</child>
+            <child>rear_left_wheel</child>
+            <axis>
+                <xyz expressed_in="__model__">0 1 0</xyz>
+            </axis>
+        </joint>
+
+        <joint name="rear_right_joint" type="revolute">
+            <parent>chassis</parent>
+            <child>rear_right_wheel</child>
+            <axis>
+                <xyz expressed_in="__model__">0 1 0</xyz>
+            </axis>
         </joint>
 
         <!-- PLUGINS  -->

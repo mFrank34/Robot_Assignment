@@ -28,14 +28,12 @@ class RobotServer(Node):
 
         self.current_odom = None
         self.front_scan = None
-        self.back_scan = None
 
         self.last_turn_direction = 0.5
 
         # subscriptions
         self.create_subscription(Odometry, '/model/square_bot/odometry', self.odom_callback, 10)
         self.create_subscription(LaserScan, '/front_lidar/scan', self.front_lidar_callback, 10)
-        self.create_subscription(LaserScan, '/back_lidar/scan', self.back_lidar_callback, 10)
         self.create_subscription(String, '/robot/command', self.command_callback, 10)
 
         self.timer = self.create_timer(0.1, self.update)
@@ -48,12 +46,7 @@ class RobotServer(Node):
     def front_lidar_callback(self, msg):
         self.front_scan = msg
 
-    def back_lidar_callback(self, msg):
-        self.back_scan = msg
-
-    # -------------------------
     # SAFE RANGE PROCESSING
-    # -------------------------
     def split_scan(self, scan):
         ranges = [r for r in scan.ranges if r > 0.0 and not math.isnan(r)]
         if not ranges:
@@ -64,7 +57,6 @@ class RobotServer(Node):
         centre = ranges[third:third * 2]
         right = ranges[third * 2:]
 
-        # safer: use median
         def safe_median(section):
             sorted_vals = sorted(section)
             mid = len(sorted_vals) // 2
@@ -79,18 +71,15 @@ class RobotServer(Node):
 
         return left_med, centre_med, right_med, all_med
 
-    # -------------------------
-    # ACTION (execution only)
-    # -------------------------
-    def action(self, state, front_centre, back_centre):
+    # ACTION
+    def action(self, state, front_centre):
         match state:
             case State.FORWARD:
                 speed = max(0.2, min(1.0, front_centre * 0.5))
                 self.controller.send_velocity(speed, 0.0)
 
             case State.REVERSE:
-                speed = max(0.1, min(0.3, back_centre * 0.3))
-                self.controller.send_velocity(-speed, 0.0)
+                self.controller.send_velocity(-0.15, 0.0)
 
             case State.TURN:
                 self.controller.send_velocity(0.0, self.last_turn_direction)
@@ -98,35 +87,27 @@ class RobotServer(Node):
             case State.STOP:
                 self.controller.send_velocity(0.0, 0.0)
 
-    # -------------------------
-    # MAIN LOOP
-    # -------------------------
     def update(self):
-        if not self.running or self.front_scan is None or self.back_scan is None:
+        if not self.running or self.front_scan is None:
             return
 
         front = self.split_scan(self.front_scan)
-        back = self.split_scan(self.back_scan)
 
-        if front is None or back is None:
+        if front is None:
             self.get_logger().warn("Invalid scan data")
             return
 
         _, front_centre, _, _ = front
-        _, back_centre, _, _ = back
 
         # update decision system
         self.reactive.update(self.front_scan, self.controller, self.current_odom)
 
-        # sync direction from reactive (single source of truth)
+        # sync direction from reactive
         self.last_turn_direction = self.reactive.turn_direction
 
         # execute movement
-        self.action(self.reactive.state, front_centre, back_centre)
+        self.action(self.reactive.state, front_centre)
 
-    # -------------------------
-    # COMMANDS
-    # -------------------------
     def command_callback(self, msg):
         if msg.data == 'start':
             self.running = True

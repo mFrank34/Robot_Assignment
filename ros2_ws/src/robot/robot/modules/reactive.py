@@ -34,10 +34,9 @@ class Reactive:
 
         # derive minimum turn clearance from robot geometry
         dims = dims or RobotDimensions()
-        self.TURN_CLEARANCE = math.sqrt(
-            (dims.chassis_length / 2) ** 2 +
-            (dims.chassis_width / 2) ** 2
-        ) + dims.safety_margin
+        half_length = max(abs(dims.front_axle_offset_x), abs(dims.rear_axle_offset_x)) + dims.wheel_radius
+        half_width = (dims.wheel_separation / 2) + dims.wheel_radius
+        self.TURN_CLEARANCE = math.sqrt(half_length ** 2 + half_width ** 2) + dims.safety_margin
 
         self.last_scan = None
         self.last_scan_time = None
@@ -61,9 +60,7 @@ class Reactive:
                     self.last_odom.pose.pose.position if self.last_odom else None
                 )
 
-    # -------------------------
     # TRANSITION CHECKS
-    # -------------------------
     def check_forward_2_reverse(self):
         if self.last_scan is None or len(self.last_scan.ranges) == 0:
             return False
@@ -102,9 +99,7 @@ class Reactive:
         elapsed = self.clock.now() - self.state_ts
         return elapsed > Duration(seconds=self.TURNING_TIME)
 
-    # -------------------------
     # STATE BEHAVIOURS
-    # -------------------------
     def forward(self, out_vel):
         out_vel.linear.x = self.SPEED_LINEAR
         out_vel.angular.z = 0.0
@@ -161,9 +156,6 @@ class Reactive:
         self.log(
             f"Turn direction: {'right' if self.turn_direction > 0 else 'left'} (L:{left_min:.2f} R:{right_min:.2f})")
 
-    # -------------------------
-    # MAIN CYCLE
-    # -------------------------
     def control_cycle(self):
         out_vel = Twist()
         if self.last_scan is None:
@@ -181,8 +173,8 @@ class Reactive:
 
         return out_vel
 
-    def update(self, front_scan, controller, odom=None):
-        self.last_scan = front_scan
+    def update(self, scan, controller, odom=None):
+        self.last_scan = scan
         self.last_scan_time = self.clock.now()
         self.controller = controller
         self.last_odom = odom
