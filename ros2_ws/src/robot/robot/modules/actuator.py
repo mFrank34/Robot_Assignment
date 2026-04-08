@@ -17,7 +17,7 @@ PAN_MIN, PAN_MAX = -1.57, 1.57
 TILT_MIN, TILT_MAX = -0.5, 0.5
 
 
-class Controller:
+class Actuator:
     def __init__(self, node):
         self.cmd_vel_pub = node.create_publisher(Twist, '/cmd_vel', 10)
         self.pan_pub = node.create_publisher(Float64, '/camera_pan', 10)

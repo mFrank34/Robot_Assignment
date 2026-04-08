@@ -14,7 +14,7 @@ from std_msgs.msg import String
 from robot.data.dimensions import RobotDimensions
 from robot.data.state import State
 
-from robot.modules.actuator import Controller
+from robot.modules.actuator import Actuator
 from robot.modules.object_avoidance import ObjectAvoidance
 from robot.modules.dynamic_explore import DynamicExplore
 from robot.modules.dynamic_speed import DynamicSpeed
@@ -27,7 +27,7 @@ class RobotServer(Node):
         self.running = False
 
         # actuator — single outbound comms layer
-        self.actuator = Controller(self)
+        self.actuator = Actuator(self)
 
         # behavior modules
         dims = RobotDimensions()
