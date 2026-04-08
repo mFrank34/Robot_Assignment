@@ -62,6 +62,9 @@ def start():
         case "3":
             print("Starting Client...")
             run("source ~/ros2_ws/install/setup.bash && ros2 run robot client")
+        case "4":
+            print("Starting Camera Viewer...")
+            run("ros2 run rqt_image_view rqt_image_view")
         case _:
             print("Invalid Input")
 
