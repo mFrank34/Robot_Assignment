@@ -1,0 +1,133 @@
+<?xml version="1.0" ?>
+<sdf version="1.7">
+    <world name="hallway_world">
+
+        <include>
+            <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
+        </include>
+
+        <include>
+            <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Ground Plane</uri>
+        </include>
+
+        <include>
+            <uri>../models/simple_bot</uri>
+            <pose>-8 0 0.05 0 0 0</pose>
+        </include>
+
+        <physics name="1ms" type="ignored">
+            <max_step_size>0.001</max_step_size>
+            <real_time_factor>1.0</real_time_factor>
+        </physics>
+
+        <model name="hall_north_1">
+            <static>true</static>
+            <pose>-5 1.5 0.5 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>0.2 0.2 0.8 1</ambient>
+                        <diffuse>0.2 0.2 0.8 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+
+        <model name="hall_north_2">
+            <static>true</static>
+            <pose>5 0.6 0.5 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1</size>
+                        </box>
+                    </geometry>
+                </visual>
+            </link>
+        </model>
+
+        <model name="hall_south_1">
+            <static>true</static>
+            <pose>-5 -1.5 0.5 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1</size>
+                        </box>
+                    </geometry>
+                </visual>
+            </link>
+        </model>
+
+        <model name="hall_south_2">
+            <static>true</static>
+            <pose>5 -0.6 0.5 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>10 0.2 1</size>
+                        </box>
+                    </geometry>
+                </visual>
+            </link>
+        </model>
+
+        <model name="hall_end">
+            <static>true</static>
+            <pose>10 0 0.5 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry>
+                        <box>
+                            <size>0.2 3 1</size>
+                        </box>
+                    </geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>0.2 3 1</size>
+                        </box>
+                    </geometry>
+                </visual>
+            </link>
+        </model>
+
+    </world>
+</sdf>
