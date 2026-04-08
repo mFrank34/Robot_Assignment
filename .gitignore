@@ -228,3 +228,4 @@ log/
 /.ignition/fuel/fuel.gazebosim.org/openrobotics/models/sun/3/model-1_4.sdf
 /.rviz2/persistent_settings
 /.ignition/gazebo/6/server.config
+/.bash_history
