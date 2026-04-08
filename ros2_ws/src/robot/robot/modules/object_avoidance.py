@@ -14,7 +14,7 @@ from robot.data.state import State
 from robot.data.dimensions import RobotDimensions
 
 
-class Reactive:
+class ObjectAvoidance:
     def __init__(self, clock, logger=None, dims=None):
         self.clock = clock
         self.logger = logger
@@ -46,6 +46,9 @@ class Reactive:
         self.reverse_start_pos = None
         self.turn_direction = self.SPEED_ANGULAR
 
+        self.turn_start_yaw = None
+        self.turn_target_angle = math.radians(45)
+
     def log(self, msg):
         if self.logger:
             self.logger.info(msg)
@@ -59,6 +62,14 @@ class Reactive:
                 self.reverse_start_pos = (
                     self.last_odom.pose.pose.position if self.last_odom else None
                 )
+            if new_state == State.TURN and self.last_odom:
+                self.turn_start_yaw = self.get_yaw_from_odom(self.last_odom)
+
+    def get_yaw_from_odom(self, odom):
+        q = odom.pose.pose.orientation
+        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+        return math.atan2(siny_cosp, cosy_cosp)
 
     def path_clear(self):
         ranges = self.last_scan.ranges
@@ -117,11 +128,18 @@ class Reactive:
         return False
 
     def check_turn_complete(self):
-        elapsed = self.clock.now() - self.state_ts
-        if elapsed < Duration(seconds=self.TURNING_TIME):
+        if self.last_odom is None or self.turn_start_yaw is None:
             return False
 
-        return self.path_clear()
+        current_yaw = self.get_yaw_from_odom(self.last_odom)
+
+        # angle difference
+        diff = abs(math.atan2(
+            math.sin(current_yaw - self.turn_start_yaw),
+            math.cos(current_yaw - self.turn_start_yaw)
+        ))
+
+        return diff >= self.turn_target_angle
 
     def forward(self, out_vel):
         out_vel.linear.x = self.SPEED_FORWARD
