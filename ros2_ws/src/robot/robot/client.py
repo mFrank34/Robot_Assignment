@@ -6,7 +6,7 @@ About: Client controlling the robot system for now
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from robot.modules.controller import Controller
+from robot.modules.actuator import Controller
 
 
 class ClientNode(Node):

@@ -1,19 +1,22 @@
 """
 File: server.py
-About: server for robot to listen to topic and send request.
+About: server for robot to listen to topic and send request /
+core system to tell how the robot modules interact with one another.
 """
 
+import math
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String
-import math
 
-from robot.modules.state import State
-from robot.modules.object_avoidance import Reactive
-from robot.modules.controller import Controller
 from robot.data.dimensions import RobotDimensions
+from robot.data.state import State
+from robot.modules.actuator import Controller
+from robot.modules.object_avoidance import Reactive
+from robot.modules.explore_system import ExploreSystem
+from robot.modules.dynamic_speed import DynamicSpeed
 
 
 class RobotServer(Node):
@@ -21,15 +24,19 @@ class RobotServer(Node):
         super().__init__('robot_node')
 
         self.running = False
-        self.controller = Controller(self)
 
+        # actuator — single outbound comms layer
+        self.actuator = Controller(self)
+
+        # behaviour modules
         dims = RobotDimensions()
         self.reactive = Reactive(self.get_clock(), self.get_logger(), dims)
+        self.explore = ExploreSystem()
+        self.speed = DynamicSpeed()
 
+        # sensor state
         self.current_odom = None
         self.front_scan = None
-
-        self.last_turn_direction = 0.5
 
         # subscriptions
         self.create_subscription(Odometry, '/model/square_bot/odometry', self.odom_callback, 10)
@@ -46,67 +53,39 @@ class RobotServer(Node):
     def front_lidar_callback(self, msg):
         self.front_scan = msg
 
-    # SAFE RANGE PROCESSING
-    def split_scan(self, scan):
-        ranges = [r for r in scan.ranges if r > 0.0 and not math.isnan(r)]
+    def get_front_centre(self, scan) -> float:
+        """Return median range of the centre third of the scan."""
+        ranges = [r for r in scan.ranges if r > 0.0 and not math.isnan(r) and not math.isinf(r)]
         if not ranges:
-            ranges = [float('inf')]
-
+            return float('inf')
         third = len(ranges) // 3
-        left = ranges[:third]
-        centre = ranges[third:third * 2]
-        right = ranges[third * 2:]
+        centre = sorted(ranges[third:third * 2])
+        return centre[len(centre) // 2] if centre else float('inf')
 
-        def safe_median(section):
-            sorted_vals = sorted(section)
-            mid = len(sorted_vals) // 2
-            return sorted_vals[mid] if sorted_vals else float('inf')
+    def arbitrate(self, front_centre: float):
+        self.speed.update(front_centre)
 
-        left_med = safe_median(left)
-        centre_med = safe_median(centre)
-        right_med = safe_median(right)
+        # update reactive with latest sensor data first
+        vel = self.reactive.update(self.front_scan, self.current_odom)
 
-        all_vals = left + centre + right
-        all_med = safe_median(all_vals)
+        # if reactive is doing something other than forward, let it handle it
+        if self.reactive.state != State.FORWARD:
+            if vel.linear.x > 0:
+                vel.linear.x = self.speed.to_velocity()
+            return vel
 
-        return left_med, centre_med, right_med, all_med
-
-    # ACTION
-    def action(self, state, front_centre):
-        match state:
-            case State.FORWARD:
-                speed = max(0.2, min(1.0, front_centre * 0.5))
-                self.controller.send_velocity(speed, 0.0)
-
-            case State.REVERSE:
-                self.controller.send_velocity(-0.15, 0.0)
-
-            case State.TURN:
-                self.controller.send_velocity(0.0, self.last_turn_direction)
-
-            case State.STOP:
-                self.controller.send_velocity(0.0, 0.0)
+        # Layer 0 — explore as base behavior
+        vel = self.explore.update(self.front_scan)
+        vel.linear.x = self.speed.to_velocity()
+        return vel
 
     def update(self):
         if not self.running or self.front_scan is None:
             return
 
-        front = self.split_scan(self.front_scan)
-
-        if front is None:
-            self.get_logger().warn("Invalid scan data")
-            return
-
-        _, front_centre, _, _ = front
-
-        # update decision system
-        self.reactive.update(self.front_scan, self.controller, self.current_odom)
-
-        # sync direction from reactive
-        self.last_turn_direction = self.reactive.turn_direction
-
-        # execute movement
-        self.action(self.reactive.state, front_centre)
+        front_centre = self.get_front_centre(self.front_scan)
+        vel = self.arbitrate(front_centre)
+        self.actuator.send_twist(vel)
 
     def command_callback(self, msg):
         if msg.data == 'start':
@@ -115,11 +94,8 @@ class RobotServer(Node):
 
         elif msg.data == 'stop':
             self.running = False
-            self.stop_robot()
+            self.actuator.stop()
             self.get_logger().info('Autonomous mode stopped')
-
-    def stop_robot(self):
-        self.controller.send_velocity(0.0, 0.0)
 
 
 def main(args=None):

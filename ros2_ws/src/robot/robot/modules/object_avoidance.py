@@ -1,14 +1,16 @@
 """
 File: object_avoidance.py
-About: obstacle avoidance with smooth state transitions
+About: Obstacle avoidance with smooth state transitions.
+       Takes a LaserScan and odometry, returns a Twist.
 Author: Michael Franks
 """
 
+import math
 from rclpy.duration import Duration
 from geometry_msgs.msg import Twist
-from robot.modules.state import State
+
+from robot.data.state import State
 from robot.data.dimensions import RobotDimensions
-import math
 
 
 class Reactive:
@@ -20,13 +22,14 @@ class Reactive:
         # robot state
         self.state = State.FORWARD
 
-        # timing system
-        self.TURNING_TIME = 2.0
-        self.REVERSING_TIME = 2.0
+        # timing — increased to give more clearance in corners
+        self.TURNING_TIME = 3.0
+        self.REVERSING_TIME = 2.5
         self.SCAN_COOLDOWN = 0.3
 
         # speeds
-        self.SPEED_LINEAR = 0.3
+        self.SPEED_FORWARD = 0.3
+        self.SPEED_REVERSE = 0.2
         self.SPEED_ANGULAR = 0.5
 
         # obstacle threshold
@@ -42,8 +45,7 @@ class Reactive:
         self.last_scan_time = None
         self.last_odom = None
         self.reverse_start_pos = None
-        self.controller = None
-        self.turn_direction = 0.5
+        self.turn_direction = self.SPEED_ANGULAR
 
     def log(self, msg):
         if self.logger:
@@ -55,35 +57,34 @@ class Reactive:
             self.state = new_state
             self.state_ts = self.clock.now()
             if new_state == State.REVERSE:
-                # snapshot position when reverse begins
                 self.reverse_start_pos = (
                     self.last_odom.pose.pose.position if self.last_odom else None
                 )
 
-    # TRANSITION CHECKS
     def check_forward_2_reverse(self):
         if self.last_scan is None or len(self.last_scan.ranges) == 0:
             return False
-        mid = len(self.last_scan.ranges) // 2
-        front_ranges = self.last_scan.ranges[mid - 10:mid + 10]
+        # forward is at the start of the array — take first 40 rays
+        front_ranges = self.last_scan.ranges[:40]
         front_vals = [r for r in front_ranges if r > 0.0 and not math.isinf(r)]
         if not front_vals:
             return False
         median_front = sorted(front_vals)[len(front_vals) // 2]
         return median_front < self.OBSTACLE_DISTANCE
 
-    def check_forward_2_stop(self):
+    def check_scan_stale(self):
+        """True if no fresh scan has arrived within SCAN_COOLDOWN seconds."""
         if self.last_scan_time is None:
             return True
         elapsed = self.clock.now() - self.last_scan_time
         return elapsed > Duration(seconds=self.SCAN_COOLDOWN)
 
-    def check_reverse_2_turn(self):
+    def check_reverse_complete(self):
+        """True once the robot has reversed far enough to safely turn."""
         elapsed = self.clock.now() - self.state_ts
         if elapsed < Duration(seconds=self.REVERSING_TIME):
             return False
 
-        # use odom to check actual distance reversed if available
         if self.last_odom is not None and self.reverse_start_pos is not None:
             pos = self.last_odom.pose.pose.position
             dx = pos.x - self.reverse_start_pos.x
@@ -92,69 +93,76 @@ class Reactive:
             self.log(f"Reversed {dist:.2f}m, need {self.TURN_CLEARANCE:.2f}m")
             return dist > self.TURN_CLEARANCE
 
-        # fallback: timer only
-        return True
+        return True  # fallback: timer only
 
-    def check_turn_2_forward(self):
+    def check_turn_complete(self):
+        """
+        True once turn timer has elapsed AND path ahead is clear.
+        Prevents resuming forward into a wall after an insufficient turn.
+        """
         elapsed = self.clock.now() - self.state_ts
-        return elapsed > Duration(seconds=self.TURNING_TIME)
+        if elapsed < Duration(seconds=self.TURNING_TIME):
+            return False
+        return not self.check_forward_2_reverse()
 
-    # STATE BEHAVIOURS
     def forward(self, out_vel):
-        out_vel.linear.x = self.SPEED_LINEAR
+        out_vel.linear.x = self.SPEED_FORWARD
         out_vel.angular.z = 0.0
-        self.log("Moving forward...")
 
         if self.check_forward_2_reverse():
             self.go_state(State.REVERSE)
-        elif self.check_forward_2_stop():
+        elif self.check_scan_stale():
             self.go_state(State.STOP)
 
     def reverse(self, out_vel):
-        out_vel.linear.x = -self.SPEED_LINEAR
+        out_vel.linear.x = -self.SPEED_REVERSE
         out_vel.angular.z = 0.0
-        self.log("Reversing...")
 
-        if self.check_reverse_2_turn():
-            self.go_state(State.TURN)
+        if self.check_reverse_complete():
             self.select_turn_direction()
+            self.go_state(State.TURN)
 
     def turn(self, out_vel):
         out_vel.linear.x = 0.0
         out_vel.angular.z = self.turn_direction
-        self.log("Turning...")
 
-        if self.check_turn_2_forward():
+        if self.check_turn_complete():
             self.go_state(State.FORWARD)
 
     def stop(self, out_vel):
         out_vel.linear.x = 0.0
         out_vel.angular.z = 0.0
-        self.log("Stopped, waiting for sensor data...")
+        self.log("Waiting for sensor data...")
 
         elapsed = self.clock.now() - self.state_ts
-        if self.last_scan is not None and len(self.last_scan.ranges) > 0:
-            if elapsed > Duration(seconds=self.SCAN_COOLDOWN):
-                if self.check_forward_2_reverse():
-                    self.go_state(State.REVERSE)
-                else:
-                    self.go_state(State.FORWARD)
+        if self.last_scan is not None and elapsed > Duration(seconds=self.SCAN_COOLDOWN):
+            if self.check_forward_2_reverse():
+                self.go_state(State.REVERSE)
+            else:
+                self.go_state(State.FORWARD)
 
     def select_turn_direction(self):
         if self.last_scan is None or len(self.last_scan.ranges) == 0:
-            self.turn_direction = 0.5
+            self.turn_direction = self.SPEED_ANGULAR
             return
 
-        third = len(self.last_scan.ranges) // 3
-        left = self.last_scan.ranges[:third]
-        right = self.last_scan.ranges[2 * third:]
+        ranges = self.last_scan.ranges
+        third = len(ranges) // 3
 
-        left_min = min([r for r in left if r > 0.0 and not math.isinf(r)] or [float('inf')])
-        right_min = min([r for r in right if r > 0.0 and not math.isinf(r)] or [float('inf')])
+        # with forward at index 0:
+        # right side = end of array, left side = middle
+        left = ranges[third:third * 2]
+        right = ranges[third * 2:]
 
-        self.turn_direction = 0.5 if right_min > left_min else -0.5
-        self.log(
-            f"Turn direction: {'right' if self.turn_direction > 0 else 'left'} (L:{left_min:.2f} R:{right_min:.2f})")
+        def median(vals):
+            clean = sorted([r for r in vals if r > 0.0 and not math.isinf(r)])
+            return clean[len(clean) // 2] if clean else 0.0
+
+        left_med = median(left)
+        right_med = median(right)
+
+        self.turn_direction = self.SPEED_ANGULAR if right_med > left_med else -self.SPEED_ANGULAR
+        self.log(f"Turning {'right' if self.turn_direction > 0 else 'left'} (L:{left_med:.2f} R:{right_med:.2f})")
 
     def control_cycle(self):
         out_vel = Twist()
@@ -173,9 +181,9 @@ class Reactive:
 
         return out_vel
 
-    def update(self, scan, controller, odom=None):
+    def update(self, scan, odom=None):
+        """Takes a LaserScan and optional odometry, returns a Twist."""
         self.last_scan = scan
         self.last_scan_time = self.clock.now()
-        self.controller = controller
         self.last_odom = odom
         return self.control_cycle()
