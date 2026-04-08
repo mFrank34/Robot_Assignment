@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.7">
-    <world name="maze_world">
+    <world name="maze-world">
 
         <include>
             <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>

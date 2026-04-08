@@ -1,18 +1,17 @@
 <?xml version="1.0" ?>
 <sdf version="1.7">
-    <world name="hallway_world">
+    <world name="hallway_box_world">
 
         <include>
             <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Sun</uri>
         </include>
-
         <include>
             <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Ground Plane</uri>
         </include>
 
         <include>
             <uri>/workspace/gazebo_projects/models/simple_bot</uri>
-            <pose>-8 0 0.05 0 0 0</pose>
+            <pose>-13 0 0.05 0 0 0</pose>
         </include>
 
         <physics name="1ms" type="ignored">
@@ -20,14 +19,65 @@
             <real_time_factor>1.0</real_time_factor>
         </physics>
 
-        <model name="wall_north">
+        <model name="outer_north">
             <static>true</static>
-            <pose>10 0 0.5 0 0 0</pose>
-            <link name="link">
-                <visual name="visual">
+            <pose>0 5 0.5 0 0 0</pose>
+            <link name="l">
+                <visual name="v">
                     <geometry>
                         <box>
-                            <size>0.2 20 1</size>
+                            <size>30 0.2 1</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+        <model name="outer_south">
+            <static>true</static>
+            <pose>0 -5 0.5 0 0 0</pose>
+            <link name="l">
+                <visual name="v">
+                    <geometry>
+                        <box>
+                            <size>30 0.2 1</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+        <model name="outer_east">
+            <static>true</static>
+            <pose>15 0 0.5 0 0 0</pose>
+            <link name="l">
+                <visual name="v">
+                    <geometry>
+                        <box>
+                            <size>0.2 10 1</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+        <model name="outer_west">
+            <static>true</static>
+            <pose>-15 0 0.5 0 0 0</pose>
+            <link name="l">
+                <visual name="v">
+                    <geometry>
+                        <box>
+                            <size>0.2 10 1</size>
                         </box>
                     </geometry>
                     <material>
@@ -38,39 +88,21 @@
             </link>
         </model>
 
-        <model name="wall_south">
+        <model name="inner_wall_north">
             <static>true</static>
-            <pose>-10 0 0.5 0 0 0</pose>
+            <pose>0 2 0.5 0 0 0</pose>
             <link name="link">
-                <visual name="visual">
+                <collision name="c">
                     <geometry>
                         <box>
-                            <size>0.2 20 1</size>
-                        </box>
-                    </geometry>
-                    <material>
-                        <ambient>1 0.8 0 1</ambient>
-                        <diffuse>1 0.8 0 1</diffuse>
-                    </material>
-                </visual>
-            </link>
-        </model>
-
-        <model name="hall_north_1">
-            <static>true</static>
-            <pose>-5 1.5 0.5 0 0 0</pose>
-            <link name="link">
-                <collision name="collision">
-                    <geometry>
-                        <box>
-                            <size>10 0.2 1</size>
+                            <size>26 0.2 1</size>
                         </box>
                     </geometry>
                 </collision>
-                <visual name="visual">
+                <visual name="v">
                     <geometry>
                         <box>
-                            <size>10 0.2 1</size>
+                            <size>26 0.2 1</size>
                         </box>
                     </geometry>
                     <material>
@@ -81,96 +113,21 @@
             </link>
         </model>
 
-        <model name="hall_north_2">
+        <model name="inner_wall_south">
             <static>true</static>
-            <pose>5 0.6 0.5 0 0 0</pose>
+            <pose>0 -2 0.5 0 0 0</pose>
             <link name="link">
-                <collision name="collision">
+                <collision name="c">
                     <geometry>
                         <box>
-                            <size>10 0.2 1</size>
+                            <size>26 0.2 1</size>
                         </box>
                     </geometry>
                 </collision>
-                <visual name="visual">
+                <visual name="v">
                     <geometry>
                         <box>
-                            <size>10 0.2 1</size>
-                        </box>
-                    </geometry>
-                    <material>
-                        <ambient>1 0.5 0 1</ambient>
-                        <diffuse>1 0.5 0 1</diffuse>
-                    </material>
-                </visual>
-            </link>
-        </model>
-
-        <model name="hall_south_1">
-            <static>true</static>
-            <pose>-5 -1.5 0.5 0 0 0</pose>
-            <link name="link">
-                <collision name="collision">
-                    <geometry>
-                        <box>
-                            <size>10 0.2 1</size>
-                        </box>
-                    </geometry>
-                </collision>
-                <visual name="visual">
-                    <geometry>
-                        <box>
-                            <size>10 0.2 1</size>
-                        </box>
-                    </geometry>
-                    <material>
-                        <ambient>1 0.5 0 1</ambient>
-                        <diffuse>1 0.5 0 1</diffuse>
-                    </material>
-                </visual>
-            </link>
-        </model>
-
-        <model name="hall_south_2">
-            <static>true</static>
-            <pose>5 -0.6 0.5 0 0 0</pose>
-            <link name="link">
-                <collision name="collision">
-                    <geometry>
-                        <box>
-                            <size>10 0.2 1</size>
-                        </box>
-                    </geometry>
-                </collision>
-                <visual name="visual">
-                    <geometry>
-                        <box>
-                            <size>10 0.2 1</size>
-                        </box>
-                    </geometry>
-                    <material>
-                        <ambient>1 0.5 0 1</ambient>
-                        <diffuse>1 0.5 0 1</diffuse>
-                    </material>
-                </visual>
-            </link>
-        </model>
-
-        <model name="hall_end">
-            <static>true</static>
-            <pose>10 0 0.5 0 0 0</pose>
-            <link name="link">
-                <collision name="collision">
-                    <geometry>
-                        <box>
-                            <size>0.2 3 1</size>
-                        </box>
-                    </geometry>
-                </collision>
-                <visual name="visual">
-                    <geometry>
-                        <box>
-                            <size>0.2 3 1</size>
+                            <size>26 0.2 1</size>
                         </box>
                     </geometry>
                     <material>
