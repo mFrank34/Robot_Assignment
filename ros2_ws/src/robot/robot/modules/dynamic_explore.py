@@ -84,9 +84,21 @@ class DynamicExplore:
         left_avg = average(left)
         right_avg = average(right)
 
+        # Corridor = walls on both sides, open ahead
         if front_avg > 1.5 and left_avg < 1.0 and right_avg < 1.0:
+            # ===== WALL CENTERING =====
+            error = left_avg - right_avg  # +ve = more space left → steer left
+
+            # small proportional control (tweakable)
+            Kp = 0.8
+
+            steering = Kp * error
+
+            # clamp to avoid over-steering
+            steering = max(-0.5, min(0.5, steering))
+
             out_vel.linear.x = EXPLORE_SPEED
-            out_vel.angular.z = 0.0
+            out_vel.angular.z = steering
             return out_vel
         # ===== END CORRIDOR =====
 
