@@ -4,7 +4,6 @@ About: object avoidance system
 Author: Michael Franks
 """
 
-
 import math
 import random
 from rclpy.duration import Duration
@@ -13,7 +12,6 @@ from geometry_msgs.msg import Twist
 from robot.data.state import State
 from robot.data.dimensions import RobotDimensions
 
-# ✅ NEW IMPORT
 from robot.utils.math_utils import clean_ranges, median, get_front_slice, angle_diff
 
 
@@ -174,10 +172,26 @@ class ObjectAvoidance:
             clean = clean_ranges(vals, self.last_scan.range_min, self.last_scan.range_max)
             return median(clean)
 
-        if get_med(left_side) > get_med(right_side):
+        left_dist = get_med(left_side)
+        right_dist = get_med(right_side)
+
+        if left_dist > right_dist:
             self.turn_direction = self.SPEED_ANGULAR * random.uniform(0.7, 1.0)
+            free_space = left_dist
         else:
             self.turn_direction = -self.SPEED_ANGULAR * random.uniform(0.7, 1.0)
+            free_space = right_dist
+
+        if free_space < 0.8:
+            angle_deg = 90
+        elif free_space < 1.5:
+            angle_deg = 70
+        else:
+            angle_deg = 45
+
+        # add slight randomness to avoid loops
+        angle_deg *= random.uniform(0.85, 1.15)
+        self.turn_target_angle = math.radians(angle_deg)
 
     def control_cycle(self):
         out_vel = Twist()
