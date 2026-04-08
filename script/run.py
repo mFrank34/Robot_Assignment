@@ -12,7 +12,8 @@ information = [
     " 1. Start Gazebo Simulation",
     " 2. Launch Server & bridge",
     " 3. Run Client",
-    " 3. Run Camera Viewer",
+    " 4. Run Camera Viewer",
+    " 5. Run Metrics Logger",
 ]
 
 simulation = [
@@ -66,6 +67,12 @@ def start():
         case "4":
             print("Starting Camera Viewer...")
             run("ros2 run rqt_image_view rqt_image_view")
+        case "5":
+            env = input("Enter environment (maze/hallway/free_roam): ")
+            trial = input("Enter trial number: ")
+
+            print("Starting Metrics Logger...")
+            run(f"source ~/ros2_ws/install/setup.bash && ros2 run robot metrics --ros-args -p env:={env} -p trial:={trial} -p duration:=300.0")
         case _:
             print("Invalid Input")
 

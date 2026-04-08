@@ -27,6 +27,7 @@ setup(
         'console_scripts': [
             'server = robot.server:main',
             'client = robot.client:main',
+            'metrics = robot.utils.metrics:main'
         ],
     },
 )
