@@ -11,7 +11,8 @@ import time
 information = [
     " 1. Start Gazebo Simulation",
     " 2. Launch Server & bridge",
-    " 3. Run Client"
+    " 3. Run Client",
+    " 3. Run Camera Viewer",
 ]
 
 simulation = [
