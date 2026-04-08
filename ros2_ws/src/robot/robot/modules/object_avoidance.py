@@ -1,9 +1,9 @@
 """
 File: object_avoidance.py
-About: Obstacle avoidance with smooth state transitions.
-       Takes a LaserScan and odometry, returns a Twist.
+About: object avoidance system
 Author: Michael Franks
 """
+
 
 import math
 import random
@@ -13,6 +13,9 @@ from geometry_msgs.msg import Twist
 from robot.data.state import State
 from robot.data.dimensions import RobotDimensions
 
+# ✅ NEW IMPORT
+from robot.utils.math_utils import clean_ranges, median, get_front_slice, angle_diff
+
 
 class ObjectAvoidance:
     def __init__(self, clock, logger=None, dims=None):
@@ -20,21 +23,18 @@ class ObjectAvoidance:
         self.logger = logger
         self.state_ts = self.clock.now()
 
-        # robot state
         self.state = State.FORWARD
 
-        # timing — increased to give more clearance in corners
         self.TURNING_TIME = 4.5
         self.REVERSING_TIME = 2.5
         self.SCAN_COOLDOWN = 0.3
 
         self.SPEED_FORWARD = 0.3
-        self.SPEED_REVERSE = 0.25  # slightly stronger reverse
-        self.SPEED_ANGULAR = 0.7  # stronger turning
+        self.SPEED_REVERSE = 0.25
+        self.SPEED_ANGULAR = 0.7
 
         self.OBSTACLE_DISTANCE = 1.0
 
-        # derive minimum turn clearance from robot geometry
         dims = dims or RobotDimensions()
         half_length = max(abs(dims.front_axle_offset_x), abs(dims.rear_axle_offset_x)) + dims.wheel_radius
         half_width = (dims.wheel_separation / 2) + dims.wheel_radius
@@ -58,10 +58,12 @@ class ObjectAvoidance:
             self.log(f"{self.state} -> {new_state}")
             self.state = new_state
             self.state_ts = self.clock.now()
+
             if new_state == State.REVERSE:
                 self.reverse_start_pos = (
                     self.last_odom.pose.pose.position if self.last_odom else None
                 )
+
             if new_state == State.TURN and self.last_odom:
                 self.turn_start_yaw = self.get_yaw_from_odom(self.last_odom)
 
@@ -73,19 +75,13 @@ class ObjectAvoidance:
 
     def path_clear(self):
         ranges = self.last_scan.ranges
-        mid = len(ranges) // 2
 
-        front_slice = ranges[mid - 60: mid + 60]
-
-        vals = [
-            r for r in front_slice
-            if self.last_scan.range_min <= r <= self.last_scan.range_max
-        ]
+        front_slice = get_front_slice(ranges, 60)
+        vals = clean_ranges(front_slice, self.last_scan.range_min, self.last_scan.range_max)
 
         if not vals:
             return False
 
-        # require EXTRA clearance before going forward again
         return min(vals) > (self.OBSTACLE_DISTANCE + 0.3)
 
     def check_forward_2_reverse(self):
@@ -93,15 +89,9 @@ class ObjectAvoidance:
             return False
 
         ranges = self.last_scan.ranges
-        mid = len(ranges) // 2
 
-        # WIDER detection (fixes corners)
-        front_slice = ranges[mid - 60: mid + 60]
-
-        vals = [
-            r for r in front_slice
-            if self.last_scan.range_min <= r <= self.last_scan.range_max
-        ]
+        front_slice = get_front_slice(ranges, 60)
+        vals = clean_ranges(front_slice, self.last_scan.range_min, self.last_scan.range_max)
 
         if not vals:
             return False
@@ -109,7 +99,6 @@ class ObjectAvoidance:
         return min(vals) < self.OBSTACLE_DISTANCE
 
     def check_scan_stale(self):
-        """True if no fresh scan has arrived within SCAN_COOLDOWN seconds."""
         if self.last_scan_time is None:
             return True
         elapsed = self.clock.now() - self.last_scan_time
@@ -117,7 +106,7 @@ class ObjectAvoidance:
 
     def check_reverse_complete(self):
         elapsed = self.clock.now() - self.state_ts
-        # BUG FIX: Use timer as a hard exit if odom fails/slips
+
         if elapsed > Duration(seconds=self.REVERSING_TIME):
             return True
 
@@ -125,6 +114,7 @@ class ObjectAvoidance:
             pos = self.last_odom.pose.pose.position
             dist = math.sqrt((pos.x - self.reverse_start_pos.x) ** 2 + (pos.y - self.reverse_start_pos.y) ** 2)
             return dist > self.TURN_CLEARANCE
+
         return False
 
     def check_turn_complete(self):
@@ -133,11 +123,7 @@ class ObjectAvoidance:
 
         current_yaw = self.get_yaw_from_odom(self.last_odom)
 
-        # angle difference
-        diff = abs(math.atan2(
-            math.sin(current_yaw - self.turn_start_yaw),
-            math.cos(current_yaw - self.turn_start_yaw)
-        ))
+        diff = angle_diff(current_yaw, self.turn_start_yaw)
 
         return diff >= self.turn_target_angle
 
@@ -185,10 +171,9 @@ class ObjectAvoidance:
         left_side = ranges[mid:]
 
         def get_med(vals):
-            clean = [r for r in vals if self.last_scan.range_min <= r <= self.last_scan.range_max]
-            return sorted(clean)[len(clean) // 2] if clean else 0.0
+            clean = clean_ranges(vals, self.last_scan.range_min, self.last_scan.range_max)
+            return median(clean)
 
-        # Add controlled randomness to turning
         if get_med(left_side) > get_med(right_side):
             self.turn_direction = self.SPEED_ANGULAR * random.uniform(0.7, 1.0)
         else:
@@ -212,7 +197,6 @@ class ObjectAvoidance:
         return out_vel
 
     def update(self, scan, odom=None):
-        """Takes a LaserScan and optional odometry, returns a Twist."""
         self.last_scan = scan
         self.last_scan_time = self.clock.now()
         self.last_odom = odom
