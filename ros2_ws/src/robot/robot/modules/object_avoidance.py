@@ -6,6 +6,7 @@ Author: Michael Franks
 """
 
 import math
+import random
 from rclpy.duration import Duration
 from geometry_msgs.msg import Twist
 
@@ -23,16 +24,14 @@ class Reactive:
         self.state = State.FORWARD
 
         # timing — increased to give more clearance in corners
-        self.TURNING_TIME = 3.0
+        self.TURNING_TIME = 4.5
         self.REVERSING_TIME = 2.5
         self.SCAN_COOLDOWN = 0.3
 
-        # speeds
         self.SPEED_FORWARD = 0.3
-        self.SPEED_REVERSE = 0.2
-        self.SPEED_ANGULAR = 0.5
+        self.SPEED_REVERSE = 0.25  # slightly stronger reverse
+        self.SPEED_ANGULAR = 0.7  # stronger turning
 
-        # obstacle threshold
         self.OBSTACLE_DISTANCE = 1.0
 
         # derive minimum turn clearance from robot geometry
@@ -61,16 +60,42 @@ class Reactive:
                     self.last_odom.pose.pose.position if self.last_odom else None
                 )
 
+    def path_clear(self):
+        ranges = self.last_scan.ranges
+        mid = len(ranges) // 2
+
+        front_slice = ranges[mid - 60: mid + 60]
+
+        vals = [
+            r for r in front_slice
+            if self.last_scan.range_min <= r <= self.last_scan.range_max
+        ]
+
+        if not vals:
+            return False
+
+        # require EXTRA clearance before going forward again
+        return min(vals) > (self.OBSTACLE_DISTANCE + 0.3)
+
     def check_forward_2_reverse(self):
-        if self.last_scan is None or len(self.last_scan.ranges) == 0:
+        if self.last_scan is None:
             return False
-        # forward is at the start of the array — take first 40 rays
-        front_ranges = self.last_scan.ranges[:40]
-        front_vals = [r for r in front_ranges if r > 0.0 and not math.isinf(r)]
-        if not front_vals:
+
+        ranges = self.last_scan.ranges
+        mid = len(ranges) // 2
+
+        # WIDER detection (fixes corners)
+        front_slice = ranges[mid - 60: mid + 60]
+
+        vals = [
+            r for r in front_slice
+            if self.last_scan.range_min <= r <= self.last_scan.range_max
+        ]
+
+        if not vals:
             return False
-        median_front = sorted(front_vals)[len(front_vals) // 2]
-        return median_front < self.OBSTACLE_DISTANCE
+
+        return min(vals) < self.OBSTACLE_DISTANCE
 
     def check_scan_stale(self):
         """True if no fresh scan has arrived within SCAN_COOLDOWN seconds."""
@@ -80,30 +105,23 @@ class Reactive:
         return elapsed > Duration(seconds=self.SCAN_COOLDOWN)
 
     def check_reverse_complete(self):
-        """True once the robot has reversed far enough to safely turn."""
         elapsed = self.clock.now() - self.state_ts
-        if elapsed < Duration(seconds=self.REVERSING_TIME):
-            return False
+        # BUG FIX: Use timer as a hard exit if odom fails/slips
+        if elapsed > Duration(seconds=self.REVERSING_TIME):
+            return True
 
-        if self.last_odom is not None and self.reverse_start_pos is not None:
+        if self.last_odom and self.reverse_start_pos:
             pos = self.last_odom.pose.pose.position
-            dx = pos.x - self.reverse_start_pos.x
-            dy = pos.y - self.reverse_start_pos.y
-            dist = math.sqrt(dx ** 2 + dy ** 2)
-            self.log(f"Reversed {dist:.2f}m, need {self.TURN_CLEARANCE:.2f}m")
+            dist = math.sqrt((pos.x - self.reverse_start_pos.x) ** 2 + (pos.y - self.reverse_start_pos.y) ** 2)
             return dist > self.TURN_CLEARANCE
-
-        return True  # fallback: timer only
+        return False
 
     def check_turn_complete(self):
-        """
-        True once turn timer has elapsed AND path ahead is clear.
-        Prevents resuming forward into a wall after an insufficient turn.
-        """
         elapsed = self.clock.now() - self.state_ts
         if elapsed < Duration(seconds=self.TURNING_TIME):
             return False
-        return not self.check_forward_2_reverse()
+
+        return self.path_clear()
 
     def forward(self, out_vel):
         out_vel.linear.x = self.SPEED_FORWARD
@@ -142,27 +160,21 @@ class Reactive:
                 self.go_state(State.FORWARD)
 
     def select_turn_direction(self):
-        if self.last_scan is None or len(self.last_scan.ranges) == 0:
-            self.turn_direction = self.SPEED_ANGULAR
-            return
-
         ranges = self.last_scan.ranges
-        third = len(ranges) // 3
+        mid = len(ranges) // 2
 
-        # with forward at index 0:
-        # right side = end of array, left side = middle
-        left = ranges[third:third * 2]
-        right = ranges[third * 2:]
+        right_side = ranges[0:mid]
+        left_side = ranges[mid:]
 
-        def median(vals):
-            clean = sorted([r for r in vals if r > 0.0 and not math.isinf(r)])
-            return clean[len(clean) // 2] if clean else 0.0
+        def get_med(vals):
+            clean = [r for r in vals if self.last_scan.range_min <= r <= self.last_scan.range_max]
+            return sorted(clean)[len(clean) // 2] if clean else 0.0
 
-        left_med = median(left)
-        right_med = median(right)
-
-        self.turn_direction = self.SPEED_ANGULAR if right_med > left_med else -self.SPEED_ANGULAR
-        self.log(f"Turning {'right' if self.turn_direction > 0 else 'left'} (L:{left_med:.2f} R:{right_med:.2f})")
+        # Add controlled randomness to turning
+        if get_med(left_side) > get_med(right_side):
+            self.turn_direction = self.SPEED_ANGULAR * random.uniform(0.7, 1.0)
+        else:
+            self.turn_direction = -self.SPEED_ANGULAR * random.uniform(0.7, 1.0)
 
     def control_cycle(self):
         out_vel = Twist()

@@ -13,9 +13,10 @@ from std_msgs.msg import String
 
 from robot.data.dimensions import RobotDimensions
 from robot.data.state import State
+
 from robot.modules.actuator import Controller
 from robot.modules.object_avoidance import Reactive
-from robot.modules.explore_system import ExploreSystem
+from robot.modules.dynamic_explore import DynamicExplore
 from robot.modules.dynamic_speed import DynamicSpeed
 
 
@@ -28,10 +29,10 @@ class RobotServer(Node):
         # actuator — single outbound comms layer
         self.actuator = Controller(self)
 
-        # behaviour modules
+        # behavior modules
         dims = RobotDimensions()
         self.reactive = Reactive(self.get_clock(), self.get_logger(), dims)
-        self.explore = ExploreSystem()
+        self.explore = DynamicExplore()
         self.speed = DynamicSpeed()
 
         # sensor state
@@ -54,13 +55,16 @@ class RobotServer(Node):
         self.front_scan = msg
 
     def get_front_centre(self, scan) -> float:
-        """Return median range of the centre third of the scan."""
-        ranges = [r for r in scan.ranges if r > 0.0 and not math.isnan(r) and not math.isinf(r)]
+        # Filter using msg metadata for safety
+        ranges = [r for r in scan.ranges if scan.range_min <= r <= scan.range_max]
         if not ranges:
             return float('inf')
-        third = len(ranges) // 3
-        centre = sorted(ranges[third:third * 2])
-        return centre[len(centre) // 2] if centre else float('inf')
+        # Take the middle third safely
+        n = len(ranges)
+        third = n // 3
+        centre_slice = sorted(ranges[third: 2 * third])
+
+        return centre_slice[len(centre_slice) // 2] if centre_slice else float('inf')
 
     def arbitrate(self, front_centre: float):
         self.speed.update(front_centre)
@@ -80,11 +84,22 @@ class RobotServer(Node):
         return vel
 
     def update(self):
-        if not self.running or self.front_scan is None:
+        if not self.running or self.front_scan is None or self.current_odom is None:
             return
 
         front_centre = self.get_front_centre(self.front_scan)
-        vel = self.arbitrate(front_centre)
+
+        vel = self.reactive.update(self.front_scan, self.current_odom)
+
+        if self.reactive.state == State.FORWARD:
+            if front_centre > 1.5:
+                vel = self.explore.update(self.front_scan, self.current_odom)
+
+        self.speed.update(front_centre)
+
+        if vel.linear.x > 0:
+            vel.linear.x = self.speed.to_velocity()
+
         self.actuator.send_twist(vel)
 
     def command_callback(self, msg):

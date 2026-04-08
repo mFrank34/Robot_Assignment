@@ -1,5 +1,5 @@
 """
-File: explore_system.py
+File: dynamic_explore.py
 About: a system to dynamically explore the world with a different behavior / Moving toward the most open space.
 Author: Michael Franks
 """
@@ -21,7 +21,7 @@ HISTORY_THRESHOLD = 0.4
 OPEN_THRESHOLD = 0.8
 
 
-class ExploreSystem:
+class DynamicExplore:
     def __init__(self):
         self.heading_history = []
         self.last_steering = 0.0
@@ -75,45 +75,72 @@ class ExploreSystem:
         if len(self.heading_history) > HISTORY_SIZE:
             self.heading_history.pop(0)
 
-    def update(self, scan) -> Twist:
-        """
-        takes a scan input and return twist steering to wards the most open unexplored direction
-        :param scan: incoming scan
-        :return: direction in twist
-        """
-        out_vel = Twist()
+    def get_yaw_from_odom(self, odom):
+        """Extracts yaw (rotation around Z) from quaternion."""
+        q = odom.pose.pose.orientation
+        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+        return math.atan2(siny_cosp, cosy_cosp)
 
-        if scan is None or len(scan.ranges) == 0:
+    def update(self, scan, odom) -> Twist:
+        out_vel = Twist()
+        if scan is None or odom is None:
             return out_vel
+
+        current_yaw = self.get_yaw_from_odom(odom)
+
+        # ===== CORRIDOR DETECTION (NEW) =====
+        ranges = scan.ranges
+        mid = len(ranges) // 2
+
+        def avg(vals):
+            clean = [r for r in vals if r > 0.0 and not math.isnan(r) and not math.isinf(r)]
+            return sum(clean) / len(clean) if clean else 0.0
+
+        front = ranges[mid - 30: mid + 30]
+        left = ranges[mid + 60: mid + 120]
+        right = ranges[mid - 120: mid - 60]
+
+        front_avg = avg(front)
+        left_avg = avg(left)
+        right_avg = avg(right)
+
+        # Corridor = walls on both sides, open ahead
+        if front_avg > 1.5 and left_avg < 1.0 and right_avg < 1.0:
+            out_vel.linear.x = EXPLORE_SPEED
+            out_vel.angular.z = 0.0
+            return out_vel
+        # ===== END CORRIDOR =====
 
         segments = self._segment_medians(scan)
-        if not segments:
-            return out_vel
 
-        # filter to open segments only
-        open_segs = [(angle, dist) for angle, dist in segments if dist >= OPEN_THRESHOLD]
+        open_segs = [(ang, dist) for ang, dist in segments if dist >= OPEN_THRESHOLD]
 
         if not open_segs:
-            # everything blocked — rotate slowly to find open space
-            out_vel.linear.x = 0.0
             out_vel.angular.z = TURN_SCALE
+            self.last_steering = TURN_SCALE
             return out_vel
 
-        # prefer segments not recently visited
-        fresh = [(angle, dist) for angle, dist in open_segs if not self._recently_visited(angle)]
-        candidates = fresh if fresh else open_segs
+        fresh = []
+        for ang, dist in open_segs:
+            global_ang = current_yaw + ang
+            if not self._recently_visited(global_ang):
+                fresh.append((ang, dist, global_ang))
 
-        # pick the most open candidate
-        best_angle, best_dist = max(candidates, key=lambda s: s[1])
+        if fresh:
+            best_local_ang, _, best_global_ang = max(fresh, key=lambda s: s[1])
+        else:
+            best_local_ang, _ = max(open_segs, key=lambda s: s[1])
+            best_global_ang = current_yaw + best_local_ang
 
-        # record this direction in history
-        self._add_history(best_angle)
+        self._add_history(best_global_ang)
 
-        # smooth steering slightly to avoid jerky motion
-        steering = best_angle * TURN_SCALE
-        self.last_steering = 0.6 * steering + 0.4 * self.last_steering
+        # ===== REDUCED STEERING =====
+        steering = best_local_ang * TURN_SCALE * 0.6
+
+        # ===== STRONGER SMOOTHING =====
+        self.last_steering = 0.4 * steering + 0.6 * self.last_steering
 
         out_vel.linear.x = EXPLORE_SPEED
         out_vel.angular.z = self.last_steering
-
         return out_vel

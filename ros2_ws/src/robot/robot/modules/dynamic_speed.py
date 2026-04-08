@@ -7,10 +7,10 @@ Author: Michael Franks
 
 class DynamicSpeed:
     MINIMUM_SPEED = 0.1
-    MAXIMUM_SPEED = 0.5
+    MAXIMUM_SPEED = 1.0
 
-    SLOW_DISTANCE = 2.0
-    STOP_DISTANCE = 0.5
+    SLOW_DISTANCE = 1.5
+    STOP_DISTANCE = 0.4
 
     def __init__(self):
         self.percent = 100
