@@ -1,85 +1,81 @@
-"""
-File: client.py
-About: Client controlling the robot system for now
-"""
-
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from robot.modules.actuator import Actuator
+import sys
+import termios
+import tty
 
 
 class ClientNode(Node):
     def __init__(self):
-        super().__init__('client_node')
+        super().__init__("client")
 
-        # Use shared commander for movement
-        self.controller = Actuator(self)
+        self.command_pub = self.create_publisher(String, "/robot/command", 10)
 
-        # Command publisher for server
-        self.command_pub = self.create_publisher(String, '/robot/command', 10)
-
-    def send_command(self, command):
+    def send_system_command(self, state):
         msg = String()
-        msg.data = command
+        msg.data = state
         self.command_pub.publish(msg)
+        self.get_logger().info(f"System: {state.upper()}")
 
 
-def main(args=None):
-    rclpy.init(args=args)
+def get_key():
+    """Read single key press from terminal"""
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+
+    try:
+        tty.setraw(fd)
+        key = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    return key
+
+
+def main():
+    rclpy.init()
     node = ClientNode()
 
     print("Controls:")
-    print("  w = forward")
-    print("  s = backward")
-    print("  a = turn left")
-    print("  d = turn right")
-    print("  q = pan camera left")
-    print("  e = pan camera right")
-    print("  r = tilt camera up")
-    print("  f = tilt camera down")
-    print("  o = start autonomous mode")
-    print("  p = stop autonomous mode")
-    print("  x = stop robot")
-    print("  z = quit")
+    print("o = start | p = stop | x = reset | z = exit")
+    print("Arrow keys supported partially (see below)")
 
-    while True:
-        key = input("Enter command: ").strip().lower()
+    try:
+        while rclpy.ok():
+            key = get_key()
 
-        match key:
-            case 'w':
-                node.controller.send_velocity(0.5, 0.0)
-            case 's':
-                node.controller.send_velocity(-0.5, 0.0)
-            case 'a':
-                node.controller.send_velocity(0.0, 0.5)
-            case 'd':
-                node.controller.send_velocity(0.0, -0.5)
-            case 'q':
-                node.controller.send_pan(0.785)
-            case 'e':
-                node.controller.send_pan(-0.785)
-            case 'r':
-                node.controller.send_tilt(-0.349)
-            case 'f':
-                node.controller.send_tilt(0.349)
-            case 'o':
-                node.send_command('start')
-                print("Autonomous mode started")
-            case 'p':
-                node.send_command('stop')
-                print("Autonomous mode stopped")
-            case 'x':
-                node.controller.send_velocity(0.0, 0.0)
-            case 'z':
-                node.controller.send_velocity(0.0, 0.0)
+            # letters
+            if key == 'o':
+                node.send_system_command("start")
+
+            elif key == 'p':
+                node.send_system_command("stop")
+
+            elif key == 'x':
+                print("Camera reset")
+
+            elif key == 'z':
                 break
-            case _:
-                print("Unknown key")
+
+            # arrow keys (3-char escape sequence)
+            elif key == '\x1b':  # ESC
+                key2 = sys.stdin.read(2)
+                if key2 == "[A":
+                    print("UP")
+                elif key2 == "[B":
+                    print("DOWN")
+                elif key2 == "[C":
+                    print("RIGHT")
+                elif key2 == "[D":
+                    print("LEFT")
+
+    except KeyboardInterrupt:
+        pass
 
     node.destroy_node()
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
