@@ -11,7 +11,7 @@ from std_msgs.msg import String
 import math
 
 from robot.modules.state import State
-from robot.modules.reactive import Reactive
+from robot.modules.object_avoidance import Reactive
 from robot.modules.controller import Controller
 from robot.data.dimensions import RobotDimensions
 

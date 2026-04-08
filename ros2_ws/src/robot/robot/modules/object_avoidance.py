@@ -1,5 +1,5 @@
 """
-File: reactive.py
+File: object_avoidance.py
 About: obstacle avoidance with smooth state transitions
 Author: Michael Franks
 """
