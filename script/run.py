@@ -28,7 +28,7 @@ def start():
     match user_input:
         case "1":
             print("Starting Gazebo Simulation...")
-            run("ign gazebo ~/gazebo_projects/worlds/maze.sdf")
+            run("ign gazebo ~/gazebo_projects/worlds/hallway.sdf")
         case "2":
             print("Starting Server & bridge...")
             run("source ~/ros2_ws/install/setup.bash && ros2 launch robot launch.py")
