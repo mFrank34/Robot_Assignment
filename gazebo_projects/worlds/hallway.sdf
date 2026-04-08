@@ -20,6 +20,42 @@
             <real_time_factor>1.0</real_time_factor>
         </physics>
 
+        <model name="wall_north">
+            <static>true</static>
+            <pose>10 0 0.5 0 0 0</pose>
+            <link name="link">
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>0.2 20 1</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+
+        <model name="wall_south">
+            <static>true</static>
+            <pose>-10 0 0.5 0 0 0</pose>
+            <link name="link">
+                <visual name="visual">
+                    <geometry>
+                        <box>
+                            <size>0.2 20 1</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model>
+
         <model name="hall_north_1">
             <static>true</static>
             <pose>-5 1.5 0.5 0 0 0</pose>
@@ -38,8 +74,8 @@
                         </box>
                     </geometry>
                     <material>
-                        <ambient>0.2 0.2 0.8 1</ambient>
-                        <diffuse>0.2 0.2 0.8 1</diffuse>
+                        <ambient>1 0.5 0 1</ambient>
+                        <diffuse>1 0.5 0 1</diffuse>
                     </material>
                 </visual>
             </link>
@@ -62,6 +98,10 @@
                             <size>10 0.2 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>1 0.5 0 1</ambient>
+                        <diffuse>1 0.5 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>
@@ -83,6 +123,10 @@
                             <size>10 0.2 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>1 0.5 0 1</ambient>
+                        <diffuse>1 0.5 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>
@@ -104,6 +148,10 @@
                             <size>10 0.2 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>1 0.5 0 1</ambient>
+                        <diffuse>1 0.5 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>
@@ -125,6 +173,10 @@
                             <size>0.2 3 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>1 0.5 0 1</ambient>
+                        <diffuse>1 0.5 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>

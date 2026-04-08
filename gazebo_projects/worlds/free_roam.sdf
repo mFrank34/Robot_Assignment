@@ -38,8 +38,8 @@
                         </box>
                     </geometry>
                     <material>
-                        <ambient>0.1 0.1 0.1 1</ambient>
-                        <diffuse>0.1 0.1 0.1 1</diffuse>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
                     </material>
                 </visual>
             </link>
@@ -61,6 +61,10 @@
                             <size>0.2 20 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>
@@ -81,6 +85,10 @@
                             <size>20 0.2 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>
@@ -101,6 +109,10 @@
                             <size>20 0.2 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>1 0.8 0 1</ambient>
+                        <diffuse>1 0.8 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>
@@ -112,19 +124,19 @@
                 <collision name="collision">
                     <geometry>
                         <box>
-                            <size>1 1 1</size>
+                            <size>0.6 0.6 1</size>
                         </box>
                     </geometry>
                 </collision>
                 <visual name="visual">
                     <geometry>
                         <box>
-                            <size>1 1 1</size>
+                            <size>0.6 0.6 1</size>
                         </box>
                     </geometry>
                     <material>
-                        <ambient>0 1 0 1</ambient>
-                        <diffuse>0 1 0 1</diffuse>
+                        <ambient>0 0.8 0 1</ambient>
+                        <diffuse>0 0.8 0 1</diffuse>
                     </material>
                 </visual>
             </link>
@@ -137,16 +149,20 @@
                 <collision name="collision">
                     <geometry>
                         <box>
-                            <size>1 1 1</size>
+                            <size>0.6 0.6 1</size>
                         </box>
                     </geometry>
                 </collision>
                 <visual name="visual">
                     <geometry>
                         <box>
-                            <size>1 1 1</size>
+                            <size>0.6 0.6 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>0 0.8 0 1</ambient>
+                        <diffuse>0 0.8 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>
@@ -158,16 +174,20 @@
                 <collision name="collision">
                     <geometry>
                         <box>
-                            <size>1 1 1</size>
+                            <size>0.6 0.6 1</size>
                         </box>
                     </geometry>
                 </collision>
                 <visual name="visual">
                     <geometry>
                         <box>
-                            <size>1 1 1</size>
+                            <size>0.6 0.6 1</size>
                         </box>
                     </geometry>
+                    <material>
+                        <ambient>0 0.8 0 1</ambient>
+                        <diffuse>0 0.8 0 1</diffuse>
+                    </material>
                 </visual>
             </link>
         </model>
