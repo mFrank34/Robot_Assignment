@@ -17,7 +17,10 @@ import os
 
 
 class MetricsNode(Node):
+    """system for gathering metrics on robot thought the different sensors"""
+
     def __init__(self):
+        """class setup and data recording"""
         super().__init__('metrics_node')
 
         self.declare_parameter("env", "maze")
@@ -66,7 +69,6 @@ class MetricsNode(Node):
             dy = y - self.last_position[1]
             dist = math.sqrt(dx * dx + dy * dy)
             self.total_distance += dist
-
 
             if dist < 0.01 and self.last_odom_time is not None:
                 self.stuck_duration += now - self.last_odom_time

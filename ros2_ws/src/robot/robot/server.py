@@ -4,7 +4,6 @@ About: server for robot to listen to topic and send request /
 core system to tell how the robot modules interact with one another.
 """
 
-import math
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
@@ -21,7 +20,9 @@ from robot.modules.dynamic_speed import DynamicSpeed
 
 
 class RobotServer(Node):
+    """robot server"""
     def __init__(self):
+        """constructor"""
         super().__init__('robot_node')
 
         self.running = False
@@ -49,12 +50,15 @@ class RobotServer(Node):
         self.get_logger().info('Robot server started')
 
     def odom_callback(self, msg):
+        """incoming odometry message"""
         self.current_odom = msg
 
     def front_lidar_callback(self, msg):
+        """incoming lidar message"""
         self.front_scan = msg
 
     def get_front_centre(self, scan) -> float:
+        """brake the scan in part and turn the main middle"""
         # Filter using msg metadata for safety
         ranges = [r for r in scan.ranges if scan.range_min <= r <= scan.range_max]
         if not ranges:
@@ -66,24 +70,8 @@ class RobotServer(Node):
 
         return centre_slice[len(centre_slice) // 2] if centre_slice else float('inf')
 
-    def arbitrate(self, front_centre: float):
-        self.speed.update(front_centre)
-
-        # update reactive with latest sensor data first
-        vel = self.reactive.update(self.front_scan, self.current_odom)
-
-        # if reactive is doing something other than forward, let it handle it
-        if self.reactive.state != State.FORWARD:
-            if vel.linear.x > 0:
-                vel.linear.x = self.speed.to_velocity()
-            return vel
-
-        # Layer 0 — explore as base behavior
-        vel = self.explore.update(self.front_scan)
-        vel.linear.x = self.speed.to_velocity()
-        return vel
-
     def update(self):
+        """main update loop and control which system is in control"""
         if not self.running or self.front_scan is None or self.current_odom is None:
             return
 
@@ -103,6 +91,7 @@ class RobotServer(Node):
         self.actuator.send_twist(vel)
 
     def command_callback(self, msg):
+        """system to enable and disable robot autonomous mode"""
         if msg.data == 'start':
             self.running = True
             self.get_logger().info('Autonomous mode started')

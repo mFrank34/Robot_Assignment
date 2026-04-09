@@ -4,3 +4,5 @@
 [user]
 	name = Michael Frank
 	email = mffranks34@gmail.com
+[core]
+	autocrlf = input

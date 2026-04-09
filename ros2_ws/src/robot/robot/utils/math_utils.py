@@ -34,6 +34,7 @@ def get_front_slice(ranges, width):
 
 
 def angle_diff(a, b):
+
     return abs(math.atan2(math.sin(a - b), math.cos(a - b)))
 
 
