@@ -7,6 +7,7 @@ from enum import Enum
 
 
 class State(Enum):
+    """directions of the robot movement system"""
     FORWARD = 0
     REVERSE = 1
     TURN = 2

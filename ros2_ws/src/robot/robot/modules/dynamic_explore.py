@@ -6,7 +6,7 @@ Author: Michael Franks
 
 import math
 from geometry_msgs.msg import Twist
-from robot.utils.math_utils import median, average, angle_diff
+from robot.utils.math_utils import median, average, angle_diff, get_yaw_from_odom
 
 SEGMENTS = 6
 EXPLORE_SPEED = 0.2
@@ -17,11 +17,15 @@ OPEN_THRESHOLD = 0.8
 
 
 class DynamicExplore:
+    """A system to dynamically explore the world."""
+
     def __init__(self):
+        """Initialize a dynamic explore object."""
         self.heading_history = []
         self.last_steering = 0.0
 
     def _segment_medians(self, scan):
+        """Segment the scan in median mode."""
         ranges = scan.ranges
         total = len(ranges)
         if total == 0:
@@ -45,6 +49,11 @@ class DynamicExplore:
         return results
 
     def _recently_visited(self, angle):
+        """
+        Check if we have enough history
+        @param angle: current yaw
+        @return: True if we have enough history to visit
+        """
         for past in self.heading_history:
             diff = angle_diff(angle, past)
             if diff < HISTORY_THRESHOLD:
@@ -52,24 +61,20 @@ class DynamicExplore:
         return False
 
     def _add_history(self, angle):
+        """ adds the angle that measured to history."""
         self.heading_history.append(angle)
         if len(self.heading_history) > HISTORY_SIZE:
             self.heading_history.pop(0)
 
-    def get_yaw_from_odom(self, odom):
-        q = odom.pose.pose.orientation
-        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-        return math.atan2(siny_cosp, cosy_cosp)
-
     def update(self, scan, odom) -> Twist:
+        """the update function for dynamic explore.
+        helping to explore and get though different corridors"""
         out_vel = Twist()
         if scan is None or odom is None:
             return out_vel
 
-        current_yaw = self.get_yaw_from_odom(odom)
-
-        # ===== CORRIDOR DETECTION =====
+        current_yaw = get_yaw_from_odom(odom)
+        # --- CORRIDOR DETECTION ---
         ranges = scan.ranges
         mid = len(ranges) // 2
 
@@ -88,15 +93,11 @@ class DynamicExplore:
         if front_avg > 1.5 and left_avg < 1.0 and right_avg < 1.0:
             # ===== WALL CENTERING =====
             error = left_avg - right_avg  # +ve = more space left → steer left
-
-            # small proportional control (tweakable)
+            # small proportional control
             Kp = 0.8
-
             steering = Kp * error
-
             # clamp to avoid over-steering
             steering = max(-0.5, min(0.5, steering))
-
             out_vel.linear.x = EXPLORE_SPEED
             out_vel.angular.z = steering
             return out_vel
@@ -104,15 +105,15 @@ class DynamicExplore:
 
         segments = self._segment_medians(scan)
 
-        open_segs = [(ang, dist) for ang, dist in segments if dist >= OPEN_THRESHOLD]
+        open_segments = [(ang, dist) for ang, dist in segments if dist >= OPEN_THRESHOLD]
 
-        if not open_segs:
+        if not open_segments:
             out_vel.angular.z = TURN_SCALE
             self.last_steering = TURN_SCALE
             return out_vel
 
         fresh = []
-        for ang, dist in open_segs:
+        for ang, dist in open_segments:
             global_ang = current_yaw + ang
             if not self._recently_visited(global_ang):
                 fresh.append((ang, dist, global_ang))
@@ -120,7 +121,7 @@ class DynamicExplore:
         if fresh:
             best_local_ang, _, best_global_ang = max(fresh, key=lambda s: s[1])
         else:
-            best_local_ang, _ = max(open_segs, key=lambda s: s[1])
+            best_local_ang, _ = max(open_segments, key=lambda s: s[1])
             best_global_ang = current_yaw + best_local_ang
 
         self._add_history(best_global_ang)

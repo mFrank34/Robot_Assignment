@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class RobotDimensions:
+    """A data class that contains information about robot dimensions"""
     chassis_length: float = 0.6   # X
     chassis_width: float = 0.5    # Y
     chassis_height: float = 0.1   # Z

@@ -39,3 +39,12 @@ def angle_diff(a, b):
 
 def clamp(val, min_val, max_val):
     return max(min_val, min(max_val, val))
+
+
+def get_yaw_from_odom(odom):
+    """Takes a robot’s orientation (in quaternion form) and returns which direction it’s facing"""
+    q = odom.pose.pose.orientation
+    sin = 2 * (q.w * q.z + q.x * q.y)
+    cosy = 1 - 2 * (q.y * q.y + q.z * q.z)
+    return math.atan2(sin, cosy)
+

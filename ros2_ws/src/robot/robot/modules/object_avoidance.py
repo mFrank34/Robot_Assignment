@@ -1,6 +1,6 @@
 """
 File: object_avoidance.py
-About: object avoidance system
+About: object avoidance system, built mostly from pieces from bump and go model adapted to fit this system instead
 Author: Michael Franks
 """
 
@@ -12,11 +12,14 @@ from geometry_msgs.msg import Twist
 from robot.data.state import State
 from robot.data.dimensions import RobotDimensions
 
-from robot.utils.math_utils import clean_ranges, median, get_front_slice, angle_diff
+from robot.utils.math_utils import clean_ranges, median, get_front_slice, angle_diff, get_yaw_from_odom
 
 
 class ObjectAvoidance:
+    """System designed to avoid objects."""
+
     def __init__(self, clock, logger=None, dims=None):
+        """Initialize the system."""
         self.clock = clock
         self.logger = logger
         self.state_ts = self.clock.now()
@@ -48,10 +51,12 @@ class ObjectAvoidance:
         self.turn_target_angle = math.radians(45)
 
     def log(self, msg):
+        """session loger, why is it here idk michael why is it"""
         if self.logger:
             self.logger.info(msg)
 
     def go_state(self, new_state):
+        """go state to new state"""
         if self.state != new_state:
             self.log(f"{self.state} -> {new_state}")
             self.state = new_state
@@ -63,51 +68,50 @@ class ObjectAvoidance:
                 )
 
             if new_state == State.TURN and self.last_odom:
-                self.turn_start_yaw = self.get_yaw_from_odom(self.last_odom)
-
-    def get_yaw_from_odom(self, odom):
-        q = odom.pose.pose.orientation
-        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-        return math.atan2(siny_cosp, cosy_cosp)
+                self.turn_start_yaw = get_yaw_from_odom(self.last_odom)
 
     def path_clear(self):
+        """checks if current path is clear
+        @:param returns if path is clear or not"""
         ranges = self.last_scan.ranges
-
         front_slice = get_front_slice(ranges, 60)
         vals = clean_ranges(front_slice, self.last_scan.range_min, self.last_scan.range_max)
-
         if not vals:
             return False
 
         return min(vals) > (self.OBSTACLE_DISTANCE + 0.3)
 
     def check_forward_2_reverse(self):
+        """ checks if system can forward 2 reverse
+        @param returns if system can forward 2 reverse or not"""
         if self.last_scan is None:
             return False
-
         ranges = self.last_scan.ranges
-
         front_slice = get_front_slice(ranges, 60)
         vals = clean_ranges(front_slice, self.last_scan.range_min, self.last_scan.range_max)
 
         if not vals:
             return False
-
         return min(vals) < self.OBSTACLE_DISTANCE
 
     def check_scan_stale(self):
+        """
+        scans and checks it the can can continues or should stop
+        :return: if it can continue or stop
+        """
         if self.last_scan_time is None:
             return True
         elapsed = self.clock.now() - self.last_scan_time
         return elapsed > Duration(seconds=self.SCAN_COOLDOWN)
 
     def check_reverse_complete(self):
+        """
+        check has completed the reversing?
+        :return: state of reverse.
+        """
         elapsed = self.clock.now() - self.state_ts
-
         if elapsed > Duration(seconds=self.REVERSING_TIME):
             return True
-
         if self.last_odom and self.reverse_start_pos:
             pos = self.last_odom.pose.pose.position
             dist = math.sqrt((pos.x - self.reverse_start_pos.x) ** 2 + (pos.y - self.reverse_start_pos.y) ** 2)
@@ -116,16 +120,21 @@ class ObjectAvoidance:
         return False
 
     def check_turn_complete(self):
+        """
+        check if turn completed though the timer system
+        :return: did it complete the turn yes or no
+        """
         if self.last_odom is None or self.turn_start_yaw is None:
             return False
-
-        current_yaw = self.get_yaw_from_odom(self.last_odom)
-
+        current_yaw = get_yaw_from_odom(self.last_odom)
         diff = angle_diff(current_yaw, self.turn_start_yaw)
-
         return diff >= self.turn_target_angle
 
     def forward(self, out_vel):
+        """
+        move the robot forward
+        :param out_vel: speed
+        """
         out_vel.linear.x = self.SPEED_FORWARD
         out_vel.angular.z = 0.0
 
@@ -135,6 +144,10 @@ class ObjectAvoidance:
             self.go_state(State.STOP)
 
     def reverse(self, out_vel):
+        """
+        make the robot go backward
+        :param out_vel: speed
+        """
         out_vel.linear.x = -self.SPEED_REVERSE
         out_vel.angular.z = 0.0
 
@@ -143,6 +156,10 @@ class ObjectAvoidance:
             self.go_state(State.TURN)
 
     def turn(self, out_vel):
+        """
+        turn the robot deepening on the direction suggested
+        :param out_vel: speed
+        """
         out_vel.linear.x = 0.0
         out_vel.angular.z = self.turn_direction
 
@@ -150,6 +167,10 @@ class ObjectAvoidance:
             self.go_state(State.FORWARD)
 
     def stop(self, out_vel):
+        """
+        stop the robot from moving
+        :param out_vel: stop speed
+        """
         out_vel.linear.x = 0.0
         out_vel.angular.z = 0.0
         self.log("Waiting for sensor data...")
@@ -162,6 +183,7 @@ class ObjectAvoidance:
                 self.go_state(State.FORWARD)
 
     def select_turn_direction(self):
+        """turing direction selector suggestor"""
         ranges = self.last_scan.ranges
         mid = len(ranges) // 2
 
@@ -194,6 +216,7 @@ class ObjectAvoidance:
         self.turn_target_angle = math.radians(angle_deg)
 
     def control_cycle(self):
+        """control cycle of robot avoidance"""
         out_vel = Twist()
         if self.last_scan is None:
             return out_vel
@@ -211,6 +234,7 @@ class ObjectAvoidance:
         return out_vel
 
     def update(self, scan, odom=None):
+        """default update loop"""
         self.last_scan = scan
         self.last_scan_time = self.clock.now()
         self.last_odom = odom

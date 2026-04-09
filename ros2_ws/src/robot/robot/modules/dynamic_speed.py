@@ -6,6 +6,7 @@ Author: Michael Franks
 
 
 class DynamicSpeed:
+    """Dynamic speed of robot control system."""
     MINIMUM_SPEED = 0.1
     MAXIMUM_SPEED = 1.0
 
