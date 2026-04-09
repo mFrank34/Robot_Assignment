@@ -14,7 +14,6 @@ class ClientNode(Node):
         self.command_pub = self.create_publisher(String, "/robot/command", 10)
         self.controller = Actuator(self)
 
-        # camera state
         self.pan = 0.0
         self.tilt = 0.0
 
@@ -35,13 +34,13 @@ class ClientNode(Node):
 def get_key():
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
-
     try:
-        tty.setcbreak(fd)  # ✅ FIXED (was setraw)
+        tty.setcbreak(fd)
         key = sys.stdin.read(1)
+        if key == '\x1b':
+            key += sys.stdin.read(2)  # Read full escape sequence while still in cbreak
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
     return key
 
 
@@ -58,7 +57,8 @@ def main():
     try:
         while rclpy.ok():
             key = get_key()
-            # ✅ Ctrl+C now works, but keep fallback
+            print(repr(key))
+
             if key == '\x03':
                 print("Exiting...")
                 break
@@ -71,36 +71,32 @@ def main():
             elif key == 'x':
                 node.pan = 0.0
                 node.tilt = 0.0
-                node.update_camera()
+                node.update_camera()  # Only update on camera change
                 print("Camera centered")
+            # MODES
+            elif key == '1':
+                node.send_system_command("reactive")
+            elif key == '2':
+                node.send_system_command("explore")
+            elif key == '3':
+                node.send_system_command("hybrid")
+
             elif key == 'z':
                 break
+
             # ARROWS
-            elif key == '\x1b':
-                key2 = sys.stdin.read(2)
-
-                if key2 == "[A":  # up
-                    node.tilt -= node.tilt_step
-
-                elif key2 == "[B":  # down
-                    node.tilt += node.tilt_step
-
-                elif key2 == "[C":  # right
-                    node.pan -= node.pan_step
-
-                elif key2 == "[D":  # left
-                    node.pan += node.pan_step
-
-                elif key == '1':
-                    node.send_system_command("reactive")
-
-                elif key == '2':
-                    node.send_system_command("explore")
-
-                elif key == '3':
-                    node.send_system_command("hybrid")
-
-                node.update_camera()
+            elif key == '\x1b[A':  # up
+                node.tilt -= node.tilt_step
+                node.update_camera()  # Only update on camera change
+            elif key == '\x1b[B':  # down
+                node.tilt += node.tilt_step
+                node.update_camera()  # Only update on camera change
+            elif key == '\x1b[C':  # right
+                node.pan -= node.pan_step
+                node.update_camera()  # Only update on camera change
+            elif key == '\x1b[D':  # left
+                node.pan += node.pan_step
+                node.update_camera()  # Only update on camera change
 
     except KeyboardInterrupt:
         print("\nCtrl+C pressed")

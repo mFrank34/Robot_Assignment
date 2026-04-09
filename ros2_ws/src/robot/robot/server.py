@@ -103,6 +103,8 @@ class RobotServer(Node):
 
     def command_callback(self, msg):
         """system to enable and disable robot autonomous mode"""
+        self.get_logger().info(f"Received command: {msg.data}")
+
         if msg.data == 'start':
             self.running = True
             self.get_logger().info('Autonomous mode started')
