@@ -1,6 +1,7 @@
 """
 File: state.py
 About: state for robots move set...
+Author: Michael Franks
 """
 
 from enum import Enum

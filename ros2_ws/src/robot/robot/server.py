@@ -12,6 +12,7 @@ from std_msgs.msg import String
 
 from robot.data.dimensions import RobotDimensions
 from robot.data.state import State
+from robot.data.mode import Mode
 
 from robot.modules.actuator import Actuator
 from robot.modules.object_avoidance import ObjectAvoidance
@@ -21,11 +22,13 @@ from robot.modules.dynamic_speed import DynamicSpeed
 
 class RobotServer(Node):
     """robot server"""
+
     def __init__(self):
         """constructor"""
         super().__init__('robot_node')
 
         self.running = False
+        self.mode_type = Mode.HYBRID
 
         # actuator — single outbound comms layer
         self.actuator = Actuator(self)
@@ -77,12 +80,20 @@ class RobotServer(Node):
 
         front_centre = self.get_front_centre(self.front_scan)
 
-        vel = self.reactive.update(self.front_scan, self.current_odom)
+        # --- HARD SWITCH BETWEEN STYLES ---
+        if self.mode_type == Mode.REACTIVE:
+            vel = self.reactive.update(self.front_scan, self.current_odom)
 
-        if self.reactive.state == State.FORWARD:
-            if front_centre > 1.5:
+        elif self.mode_type == Mode.EXPLORE:
+            vel = self.explore.update(self.front_scan, self.current_odom)
+
+        elif self.mode_type == Mode.HYBRID:
+            vel = self.reactive.update(self.front_scan, self.current_odom)
+
+            if self.reactive.state == State.FORWARD and front_centre > 1.5:
                 vel = self.explore.update(self.front_scan, self.current_odom)
 
+        # speed stays shared
         self.speed.update(front_centre)
 
         if vel.linear.x > 0:
@@ -100,6 +111,18 @@ class RobotServer(Node):
             self.running = False
             self.actuator.stop()
             self.get_logger().info('Autonomous mode stopped')
+
+        elif msg.data == 'reactive':
+            self.mode_type = Mode.REACTIVE
+            self.get_logger().info('Mode: Reactive only')
+
+        elif msg.data == 'explore':
+            self.mode_type = Mode.EXPLORE
+            self.get_logger().info('Mode: Explore only')
+
+        elif msg.data == 'hybrid':
+            self.mode_type = Mode.HYBRID
+            self.get_logger().info('Mode: Hybrid')
 
 
 def main(args=None):

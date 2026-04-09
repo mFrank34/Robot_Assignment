@@ -51,6 +51,7 @@ def main():
 
     print("Controls:")
     print("o = start | p = stop | x = center | z = exit")
+    print("1 = reactive | 2 = explore | 3 = hybrid")
     print("arrows = camera pan/tilt")
     print("Ctrl+C = exit")
 
@@ -89,6 +90,15 @@ def main():
 
                 elif key2 == "[D":  # left
                     node.pan += node.pan_step
+
+                elif key == '1':
+                    node.send_system_command("reactive")
+
+                elif key == '2':
+                    node.send_system_command("explore")
+
+                elif key == '3':
+                    node.send_system_command("hybrid")
 
                 node.update_camera()
 
